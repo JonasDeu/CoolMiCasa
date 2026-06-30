@@ -1,8 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useStore } from "./store/useStore";
 import { useWeather } from "./hooks/useWeather";
-import { analyzeAirflow } from "./lib/airflow";
-import { buildFanPlan } from "./lib/fanPlan";
+import { DerivedProvider } from "./state/derived";
 import { Header } from "./components/Header";
 import { HelpDialog } from "./components/HelpDialog";
 import { NowBanner } from "./components/advice/NowBanner";
@@ -23,8 +22,6 @@ type Tab = "setup" | "plan" | "advice";
 export function App() {
   useWeather(); // keep weather in sync with the location
 
-  const doc = useStore((s) => s.doc);
-  const weather = useStore((s) => s.weather);
   const selection = useStore((s) => s.selection);
   const flashMsg = useStore((s) => s.flashMsg);
   const flash = useStore((s) => s.flash);
@@ -33,10 +30,6 @@ export function App() {
 
   const [help, setHelp] = useState(false);
   const [tab, setTab] = useState<Tab>("plan");
-
-  // The airflow + fan plan are derived once here and shared with the canvas and the panel.
-  const air = useMemo(() => analyzeAirflow(doc, weather), [doc, weather]);
-  const plan = useMemo(() => buildFanPlan(doc, weather, air), [doc, weather, air]);
 
   // global keyboard: undo + delete (ignored while typing in a field)
   useEffect(() => {
@@ -63,54 +56,56 @@ export function App() {
   }, [flashMsg, flash]);
 
   return (
-    <div className="app">
-      <Header onHelp={() => setHelp(true)} />
-      <NowBanner />
+    <DerivedProvider>
+      <div className="app">
+        <Header onHelp={() => setHelp(true)} />
+        <NowBanner />
 
-      <div className="layout" data-tab={tab}>
-        {/* SETUP */}
-        <aside className="col col--setup">
-          <LocationCard />
-          <TemplatesCard />
-          <SettingsCard />
-          <OrientationCard />
-          {selection && <SelectionCard />}
-        </aside>
+        <div className="layout" data-tab={tab}>
+          {/* SETUP */}
+          <aside className="col col--setup">
+            <LocationCard />
+            <TemplatesCard />
+            <SettingsCard />
+            <OrientationCard />
+            {selection && <SelectionCard />}
+          </aside>
 
-        {/* FLOOR PLAN */}
-        <main className="col col--plan">
-          <div className="canvas-wrap">
-            <Toolbar />
-            <FloorPlanCanvas air={air} fanSpots={plan.spots} />
-            {flashMsg && <div className="toast">{flashMsg}</div>}
-          </div>
-          <Legend />
-        </main>
+          {/* FLOOR PLAN */}
+          <main className="col col--plan">
+            <div className="canvas-wrap">
+              <Toolbar />
+              <FloorPlanCanvas />
+              {flashMsg && <div className="toast">{flashMsg}</div>}
+            </div>
+            <Legend />
+          </main>
 
-        {/* ADVICE */}
-        <aside className="col col--advice">
-          <Card title="Do this now">
-            <ActionList />
-          </Card>
-          <Card title="Airflow & fan plan">
-            <FanPlanPanel air={air} plan={plan} />
-          </Card>
-          <Card title="Next 24 hours">
-            <Timeline />
-          </Card>
-        </aside>
+          {/* ADVICE */}
+          <aside className="col col--advice">
+            <Card title="Do this now">
+              <ActionList />
+            </Card>
+            <Card title="Airflow & fan plan">
+              <FanPlanPanel />
+            </Card>
+            <Card title="Next 24 hours">
+              <Timeline />
+            </Card>
+          </aside>
+        </div>
+
+        <nav className="tabbar">
+          {(["setup", "plan", "advice"] as Tab[]).map((t) => (
+            <button key={t} className={tab === t ? "is-active" : ""} onClick={() => setTab(t)}>
+              {t === "setup" ? "⚙️ Setup" : t === "plan" ? "🗺 Plan" : "💡 Advice"}
+            </button>
+          ))}
+        </nav>
+
+        <HelpDialog open={help} onClose={() => setHelp(false)} />
       </div>
-
-      <nav className="tabbar">
-        {(["setup", "plan", "advice"] as Tab[]).map((t) => (
-          <button key={t} className={tab === t ? "is-active" : ""} onClick={() => setTab(t)}>
-            {t === "setup" ? "⚙️ Setup" : t === "plan" ? "🗺 Plan" : "💡 Advice"}
-          </button>
-        ))}
-      </nav>
-
-      <HelpDialog open={help} onClose={() => setHelp(false)} />
-    </div>
+    </DerivedProvider>
   );
 }
 

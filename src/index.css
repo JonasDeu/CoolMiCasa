@@ -178,15 +178,20 @@ button.full {
   color: var(--muted);
   font-size: 12px;
 }
-.appbar__loc {
+.appbar__right {
   margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.appbar__loc {
   font-size: 12px;
   color: var(--muted);
   background: var(--surface-2);
   border: 1px solid var(--line);
   padding: 5px 10px;
   border-radius: 999px;
-  max-width: 38vw;
+  max-width: 26vw;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -195,11 +200,24 @@ button.full {
   display: flex;
   gap: 6px;
 }
-.appbar__loc + .appbar__actions {
-  margin-left: 12px;
+.clock {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--txt);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  padding: 5px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
 }
-.appbar__actions:first-of-type {
-  margin-left: auto;
+.clock__tz {
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 400;
 }
 
 /* ---- now banner (headline) ---- */
@@ -393,6 +411,26 @@ button.full {
   border-radius: 8px;
   padding: 6px 10px;
   max-width: min(440px, calc(100% - 20px));
+}
+.temp-edit {
+  position: absolute;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(11, 18, 25, 0.96);
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  padding: 3px 6px;
+  box-shadow: var(--shadow);
+}
+.temp-edit input {
+  width: 66px;
+  padding: 4px 6px;
+}
+.temp-edit span {
+  color: var(--muted);
+  font-size: 12px;
 }
 .toast {
   position: absolute;

@@ -9,7 +9,7 @@ const TOOLS: { id: Tool; label: string; icon: string }[] = [
 ];
 
 const HINTS: Record<Tool, string> = {
-  select: "Click a room, window or door to edit it. Drag to move; drag the corner of a room to resize.",
+  select: "Click to edit, drag to move, drag a room's corner to resize. Double-click a room to set its temperature.",
   room: "Click and drag on the canvas to draw a room.",
   window: "Click on (or near) a wall to drop a window, then drag it to slide along the wall.",
   door: "Click the wall between two rooms to connect them. Double-click a door to open/shut it.",

@@ -1,10 +1,12 @@
 import { useStore } from "../../store/useStore";
+import { useDerived } from "../../state/derived";
 import { compassName, windowFacing } from "../../lib/geometry";
 import {
   fmt,
   hasCrossVentilation,
   maxIndoor,
   nowHour,
+  roomTarget,
   sunOnWindow,
   ventilate,
   windRole,
@@ -12,7 +14,7 @@ import {
 import { Pill } from "../ui";
 
 export function ActionList() {
-  const doc = useStore((s) => s.doc);
+  const { docEff: doc, temps } = useDerived();
   const weather = useStore((s) => s.weather);
 
   if (!doc.location) return <p className="muted">Add a location (top-left) to fetch outdoor temperature.</p>;
@@ -26,13 +28,14 @@ export function ActionList() {
   const globalVent = ventilate(outdoor, indoorMax, comfort);
   const wd = weather.current.windDir,
     ws = weather.current.windSpd;
-  const noTemp = doc.rooms.some((r) => !isFinite(+r.temp));
+  const anyEst = doc.rooms.some((r) => temps[r.id]?.estimated);
 
   return (
     <>
-      {noTemp && (
+      {anyEst && (
         <div className="warnbox">
-          Some rooms have no temperature yet — click a room and type what your thermometer reads for accurate advice.
+          Some rooms have no sensor and are <b>estimated</b> (shown with ~). Double-click a room on the map to enter a real
+          reading for sharper advice.
         </div>
       )}
 
@@ -69,13 +72,18 @@ export function ActionList() {
       {doc.rooms.map((r) => {
         const wins = doc.windows.filter((w) => w.roomId === r.id);
         const indoorT = +r.temp;
-        const warm = indoorT >= comfort;
+        const target = roomTarget(doc, r);
+        const warm = indoorT >= target;
+        const est = temps[r.id]?.estimated;
         return (
           <div className="rec" key={r.id}>
             <div className="rec__ttl">
               <span>{r.name}</span>
               <span className="muted">
-                {isFinite(indoorT) ? fmt(indoorT) + "°" : "—"} {warm ? "🔥" : "✅"}
+                {est && "~"}
+                {isFinite(indoorT) ? fmt(indoorT) + "°" : "—"}
+                {est && <span className="tag"> est</span>} <span className="tag">/ {fmt(target)}° target</span>{" "}
+                {warm ? "🔥" : "✅"}
               </span>
             </div>
             <ul>
@@ -92,7 +100,7 @@ export function ActionList() {
                     </li>
                   );
                 }
-                if (ventilate(outT, indoorT, comfort)) {
+                if (ventilate(outT, indoorT, target)) {
                   const role = windRole(windowFacing(w, doc.northDeg), wd, ws);
                   return (
                     <li key={w.id}>

@@ -15,10 +15,20 @@ function defaultDoc(): Doc {
     comfort: 24,
     ceilingH: 2.5,
     fanCount: 2,
+    pxPerM: 50,
+    canSealFan: false,
     rooms: [],
     windows: [],
     doors: [],
   };
+}
+
+/** Rooms loaded/seeded without an explicit `measured` flag are treated as real readings. */
+function markLoadedRoomsMeasured(d: Doc): Doc {
+  d.rooms.forEach((r) => {
+    if (r.measured === undefined) r.measured = true;
+  });
+  return d;
 }
 
 function seedDoc(): Doc {
@@ -27,7 +37,7 @@ function seedDoc(): Doc {
   d.rooms = t.rooms;
   d.windows = t.windows;
   d.doors = t.doors;
-  return d;
+  return markLoadedRoomsMeasured(d);
 }
 
 function loadDoc(): Doc {
@@ -35,7 +45,7 @@ function loadDoc(): Doc {
     const raw = localStorage.getItem(SKEY);
     if (raw) {
       const s = JSON.parse(raw);
-      if (s && s.rooms) return { ...defaultDoc(), ...s };
+      if (s && s.rooms) return markLoadedRoomsMeasured({ ...defaultDoc(), ...s });
     }
     const rawV1 = localStorage.getItem(SKEY_V1);
     if (rawV1) {
@@ -43,7 +53,7 @@ function loadDoc(): Doc {
       if (s && s.rooms) {
         const d: Doc = { ...defaultDoc(), ...s };
         delete (d as Doc & { fans?: unknown }).fans;
-        return d;
+        return markLoadedRoomsMeasured(d);
       }
     }
   } catch {
@@ -89,6 +99,8 @@ export interface AppState {
   setCeiling: (v: number) => void;
   setFanCount: (v: number) => void;
   setNorth: (v: number) => void;
+  setPxPerM: (v: number) => void;
+  setCanSealFan: (v: boolean) => void;
   setLocation: (loc: LatLon | null) => void;
   setWeather: (w: Weather | null, status: AppState["weatherStatus"]) => void;
 
@@ -155,6 +167,16 @@ export const useStore = create<AppState>()(
         s.doc.northDeg = v;
         persist(s.doc);
       }),
+    setPxPerM: (v) =>
+      set((s) => {
+        s.doc.pxPerM = Math.max(10, Math.min(200, v));
+        persist(s.doc);
+      }),
+    setCanSealFan: (v) =>
+      set((s) => {
+        s.doc.canSealFan = v;
+        persist(s.doc);
+      }),
     setLocation: (loc) =>
       set((s) => {
         s.doc.location = loc;
@@ -215,6 +237,7 @@ export const useStore = create<AppState>()(
           w: 1,
           h: 1,
           temp: 26,
+          measured: false, // assume no sensor until the user types a reading
         });
         s.selection = { type: "room", id };
       });
@@ -359,6 +382,9 @@ export const useStore = create<AppState>()(
       set((s) => {
         s.undoStack.push(JSON.stringify(s.doc));
         const data = t.build();
+        data.rooms.forEach((r) => {
+          if (r.measured === undefined) r.measured = true;
+        });
         s.doc.rooms = data.rooms;
         s.doc.windows = data.windows;
         s.doc.doors = data.doors;

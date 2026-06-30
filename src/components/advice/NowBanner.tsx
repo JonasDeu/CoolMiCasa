@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { useStore } from "../../store/useStore";
+import { useDerived } from "../../state/derived";
 import { compassName } from "../../lib/geometry";
 import { fmt, maxIndoor, nowHour, ventilate } from "../../lib/recommend";
 
@@ -8,7 +9,7 @@ import { fmt, maxIndoor, nowHour, ventilate } from "../../lib/recommend";
  * three numbers that justify it. This is the first thing the user should read.
  */
 export function NowBanner() {
-  const doc = useStore((s) => s.doc);
+  const { docEff: doc } = useDerived();
   const weather = useStore((s) => s.weather);
   const status = useStore((s) => s.weatherStatus);
 

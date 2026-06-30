@@ -12,7 +12,7 @@ import {
   winSill,
   winTop,
 } from "./geometry";
-import { fmt, nowHour } from "./recommend";
+import { fmt, nowHour, roomTarget } from "./recommend";
 
 export interface FanSpot {
   x: number;
@@ -46,23 +46,24 @@ export function buildFanPlan(doc: Doc, weather: Weather | null, air: AirflowResu
   const h = nowHour(weather);
   if (!h || !weather) return { spots: [], stack: null };
 
-  const comfort = +doc.comfort,
-    wd = weather.current.windDir;
+  const wd = weather.current.windDir;
   const rooms = doc.rooms;
   const plan: FanSpot[] = [];
   let stack: StackInfo | null = null;
 
   if (air.active) {
     const CH = doc.ceilingH || 2.5;
+    const canSeal = !!doc.canSealFan;
 
-    // 1) PRIMARY EXHAUST — leeward + highest + warmest opening; fan at the window top (stack effect)
+    // 1) PRIMARY EXHAUST — leeward + highest + warmest-over-target opening (stack effect)
     let exWin: WindowItem | null = null,
       exScore = -1e9;
     air.openWins.forEach((w) => {
       if (!air.exhaustRooms.has(w.roomId)) return;
       const lee = air.calm ? 0 : angDiff(windowFacing(w, doc.northDeg), wd);
       const r = roomById(rooms, w.roomId);
-      const score = lee * 0.5 + winTop(w, CH) * 40 + (+(r?.temp ?? 0) || 0);
+      const over = r ? Math.max(0, (+r.temp || 0) - roomTarget(doc, r)) : 0;
+      const score = lee * 0.5 + winTop(w, CH) * 40 + (+(r?.temp ?? 0) || 0) + over * 3;
       if (score > exScore) {
         exScore = score;
         exWin = w;
@@ -100,14 +101,19 @@ export function buildFanPlan(doc: Doc, weather: Weather | null, air: AirflowResu
         v = outwardVec(ew.side),
         r = roomById(rooms, ew.roomId);
       exTop = winTop(ew, CH);
+      const exH = canSeal ? exTop : Math.min(exTop, 1.3);
       plan.push({
         x: m.x,
         y: m.y,
         dir: v,
-        heightM: +exTop.toFixed(2),
-        heightName: `HIGH — in the top of the window opening (${exTop.toFixed(1)} m above floor)`,
-        label: `Box fan: ${r?.name ?? "room"}, ${compassName(windowFacing(ew, doc.northDeg))} window — blow OUT`,
-        why: "Your engine. Keep this one IN the window blowing out and seal the gaps around it so hot air can't loop back in. Hot air floats to the ceiling, so exhausting high harnesses the stack effect and pulls cool air in through every low opening.",
+        heightM: +exH.toFixed(2),
+        heightName: canSeal
+          ? `HIGH — sealed into the top of the window opening (${exTop.toFixed(1)} m above floor)`
+          : `As HIGH as it'll stand — on a shelf/sill just inside the open window, aimed OUT (~${exH.toFixed(1)} m)`,
+        label: `${canSeal ? "Box fan" : "Fan"}: ${r?.name ?? "room"}, ${compassName(windowFacing(ew, doc.northDeg))} window — blow OUT`,
+        why: canSeal
+          ? "Your engine. Seal it into the window blowing out so hot air can't loop back in. Hot air floats to the ceiling, so exhausting high harnesses the stack effect and pulls cool air in through every low opening."
+          : "Your engine. You can't seal this one in, so stand it as high as you can just inside the open window blowing out, and stuff a towel into the gaps around it. It still drives hot ceiling air out and pulls the cross-breeze through — just less airtight than a sealed box fan.",
         prio: 1,
       });
     }
@@ -120,14 +126,19 @@ export function buildFanPlan(doc: Doc, weather: Weather | null, air: AirflowResu
         const m = windowMid(iw, rooms)!,
           v = outwardVec(iw.side),
           r = roomById(rooms, iw.roomId);
+        const inH = canSeal ? inSill : inSill + 0.2;
         plan.push({
           x: m.x,
           y: m.y,
           dir: { x: -v.x, y: -v.y },
-          heightM: +inSill.toFixed(2),
-          heightName: `LOW — in the window opening at the sill (${inSill.toFixed(1)} m above floor)`,
-          label: `Box fan: ${r?.name ?? "room"}, ${compassName(windowFacing(iw, doc.northDeg))} window — blow IN`,
-          why: "No wind, so force the intake. Keep it IN the opening (its back must face outside to grab cool air), blowing in and angled slightly down. Cool night air is dense and sinks, so this floods the floor and feeds the high exhaust.",
+          heightM: +inH.toFixed(2),
+          heightName: canSeal
+            ? `LOW — sealed into the window at the sill (${inSill.toFixed(1)} m above floor)`
+            : `LOW — on the floor right by the open window, aimed in & slightly down (~${inH.toFixed(1)} m)`,
+          label: `${canSeal ? "Box fan" : "Fan"}: ${r?.name ?? "room"}, ${compassName(windowFacing(iw, doc.northDeg))} window — blow IN`,
+          why: canSeal
+            ? "No wind, so force the intake. Seal it into the opening (its back must face outside to grab cool air), blowing in and angled slightly down. Cool night air is dense and sinks, so this floods the floor and feeds the high exhaust."
+            : "No wind, so force the intake. Set it low right by the open window blowing in and angled down, and block the side gaps with a towel since you can't seal it. Cool night air sinks, so this floods the floor and feeds the high exhaust.",
           prio: 2,
         });
       }
@@ -206,20 +217,21 @@ export function buildFanPlan(doc: Doc, weather: Weather | null, air: AirflowResu
       });
     });
   } else {
-    // SEALED — personal circulation fans in the warm, occupied rooms (most impactful first)
+    // SEALED — personal circulation fans in the rooms furthest over their own target
     const warm = rooms
-      .filter((r) => (+r.temp || 0) >= comfort - 0.5)
-      .sort((a, b) => +b.temp - +a.temp);
+      .filter((r) => (+r.temp || 0) >= roomTarget(doc, r) - 0.5)
+      .sort((a, b) => +b.temp - roomTarget(doc, b) - (+a.temp - roomTarget(doc, a)));
     warm.forEach((r, i) => {
       const c = roomCenter(r);
       const horiz = r.w >= r.h;
+      const over = +r.temp - roomTarget(doc, r);
       plan.push({
         x: c.x,
         y: c.y,
         dir: horiz ? { x: 1, y: 0 } : { x: 0, y: 1 },
         heightM: 1.1,
         heightName: "SEATED height (~1.0–1.2 m), aimed at where you sit/sleep",
-        label: `Circulating fan: ${r.name} (${fmt(r.temp)}°)`,
+        label: `Circulating fan: ${r.name} (${fmt(r.temp)}° · ${over > 0 ? "+" + fmt(over) : fmt(over)} vs target)`,
         why: "Windows are shut, so don't pull in hotter outside air. Moving air over skin feels ~3 °C cooler. A fan angled across a doorway also entrains and drags air from the next room (Bernoulli entrainment).",
         prio: 1 + i,
       });

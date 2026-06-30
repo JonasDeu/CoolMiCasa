@@ -1,4 +1,5 @@
 import { useStore } from "../store/useStore";
+import { Clock } from "./Clock";
 
 interface Props {
   onHelp: () => void;
@@ -18,18 +19,20 @@ export function Header({ onHelp }: Props) {
         <div className="appbar__sub">Passive cooling helper — no AC required</div>
       </div>
 
-      {location && <div className="appbar__loc">📍 {location.name}</div>}
-
-      <div className="appbar__actions">
-        <button onClick={onHelp}>How it works</button>
-        <button
-          className="danger"
-          onClick={() => {
-            if (confirm("Reset everything (layout, location, temperatures)?")) resetAll();
-          }}
-        >
-          Reset
-        </button>
+      <div className="appbar__right">
+        <Clock />
+        {location && <div className="appbar__loc">📍 {location.name}</div>}
+        <div className="appbar__actions">
+          <button onClick={onHelp}>How it works</button>
+          <button
+            className="danger"
+            onClick={() => {
+              if (confirm("Reset everything (layout, location, temperatures)?")) resetAll();
+            }}
+          >
+            Reset
+          </button>
+        </div>
       </div>
     </header>
   );

@@ -9,6 +9,11 @@ export function maxIndoor(rooms: Room[]): number | null {
   return rooms.length ? Math.max(...rooms.map((r) => +r.temp || 0)) : null;
 }
 
+/** A room's effective comfort target: its own override, else the document default. */
+export function roomTarget(doc: Doc, room: Room): number {
+  return room.target != null ? +room.target : +doc.comfort;
+}
+
 /** Is opening windows beneficial at outdoorT given indoorT and the comfort target? */
 export function ventilate(
   outdoorT: number | null,
@@ -66,13 +71,13 @@ export function windRole(facing: number, windDir: number, windSpd: number): Wind
 export function openWindowsNow(doc: Doc, weather: Weather | null): WindowItem[] {
   const h = nowHour(weather);
   if (!h) return [];
-  const comfort = +doc.comfort;
   return doc.windows.filter((w) => {
     const r = roomById(doc.rooms, w.roomId);
     const indoorT = r ? +r.temp : maxIndoor(doc.rooms);
+    const target = r ? roomTarget(doc, r) : +doc.comfort;
     const outT = w.temp != null ? +w.temp : h.temp;
     const sunHit = sunOnWindow(w, h.sun, doc.northDeg) && h.rad > 120;
-    return !sunHit && ventilate(outT, indoorT, comfort);
+    return !sunHit && ventilate(outT, indoorT, target);
   });
 }
 

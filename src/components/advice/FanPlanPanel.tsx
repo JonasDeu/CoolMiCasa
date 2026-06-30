@@ -1,16 +1,12 @@
 import type { AirflowResult } from "../../lib/airflow";
 import type { FanPlan } from "../../lib/fanPlan";
 import { useStore } from "../../store/useStore";
+import { useDerived } from "../../state/derived";
 import { roomById, winArea } from "../../lib/geometry";
 import { maxIndoor, nowHour } from "../../lib/recommend";
 
-interface Props {
-  air: AirflowResult | null;
-  plan: FanPlan;
-}
-
-export function FanPlanPanel({ air, plan }: Props) {
-  const doc = useStore((s) => s.doc);
+export function FanPlanPanel() {
+  const { air, plan, docEff: doc } = useDerived();
   const weather = useStore((s) => s.weather);
 
   if (!weather) return <p className="muted">Set a location to model airflow and fan placement.</p>;
@@ -117,9 +113,19 @@ export function FanPlanPanel({ air, plan }: Props) {
           )}
         </div>
         <div className="muted mt">
-          📍 <b>Where to stand a fan:</b> it blows a focused jet but draws air diffusely. Keep <b>window</b> fans in the
-          opening (an intake's back must face outside; seal an exhaust). Stand <b>doorway</b> fans ~½ m back on the
-          upstream side and aim through the gap — the jet entrains extra air and amplifies the flow.
+          📍 <b>Where to stand a fan:</b> it blows a focused jet but draws air diffusely.{" "}
+          {doc.canSealFan ? (
+            <>
+              Seal <b>window</b> fans into the opening (an intake's back must face outside; seal an exhaust).
+            </>
+          ) : (
+            <>
+              You said your fans can't be sealed in, so stand <b>window</b> fans just inside the opening and stuff a towel
+              into the gaps for a better seal.
+            </>
+          )}{" "}
+          Stand <b>doorway</b> fans ~½ m back on the upstream side and aim through the gap — the jet entrains extra air and
+          amplifies the flow.
         </div>
       </div>
     );

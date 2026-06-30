@@ -1,18 +1,12 @@
-import { useEffect, useRef } from "react";
-import type { AirflowResult } from "../../lib/airflow";
-import type { FanSpot } from "../../lib/fanPlan";
+import { useEffect, useRef, useState } from "react";
 import type { Door, Pt, Room, WindowItem } from "../../types";
 import { roomById, windowMid } from "../../lib/geometry";
 import { useStore } from "../../store/useStore";
+import { useDerived } from "../../state/derived";
 import { drawScene } from "./draw";
 
 const CW = 900;
 const CH = 620;
-
-interface Props {
-  air: AirflowResult | null;
-  fanSpots: FanSpot[];
-}
 
 type Drag =
   | { mode: "draw"; id: string; sx: number; sy: number }
@@ -22,13 +16,21 @@ type Drag =
   | { mode: "win"; id: string }
   | null;
 
-export function FloorPlanCanvas({ air, fanSpots }: Props) {
+interface Editing {
+  id: string;
+  left: number;
+  top: number;
+  value: string;
+}
+
+export function FloorPlanCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const dragRef = useRef<Drag>(null);
+  const [editing, setEditing] = useState<Editing | null>(null);
 
-  const doc = useStore((s) => s.doc);
   const weather = useStore((s) => s.weather);
   const selection = useStore((s) => s.selection);
+  const { docEff: doc, temps, air, plan } = useDerived();
 
   // redraw whenever anything visible changes
   useEffect(() => {
@@ -36,8 +38,17 @@ export function FloorPlanCanvas({ air, fanSpots }: Props) {
     if (!cv) return;
     const ctx = cv.getContext("2d");
     if (!ctx) return;
-    drawScene(ctx, { width: CW, height: CH, doc, weather, air, fanSpots, selection });
-  }, [doc, weather, air, fanSpots, selection]);
+    drawScene(ctx, {
+      width: CW,
+      height: CH,
+      doc,
+      weather,
+      air,
+      fanSpots: plan.spots,
+      selection,
+      temps,
+    });
+  }, [doc, weather, air, plan, selection, temps]);
 
   function toCanvas(ev: React.PointerEvent | React.MouseEvent): Pt {
     const cv = canvasRef.current!;
@@ -71,6 +82,7 @@ export function FloorPlanCanvas({ air, fanSpots }: Props) {
   }
 
   function onPointerDown(ev: React.PointerEvent) {
+    if (editing) commitEdit();
     const s = useStore.getState();
     (ev.target as HTMLElement).setPointerCapture?.(ev.pointerId);
     const p = toCanvas(ev);
@@ -148,6 +160,28 @@ export function FloorPlanCanvas({ air, fanSpots }: Props) {
     dragRef.current = null;
   }
 
+  function openEditor(r: Room) {
+    const cv = canvasRef.current;
+    if (!cv) return;
+    const rect = cv.getBoundingClientRect();
+    const scale = rect.width / CW;
+    const t = useStore.getState().doc; // original doc for the stored value
+    const room = roomById(t.rooms, r.id);
+    setEditing({
+      id: r.id,
+      left: r.x * scale + 6,
+      top: (r.y + 24) * scale,
+      value: room && room.measured !== false && Number.isFinite(+room.temp) ? String(room.temp) : "",
+    });
+  }
+
+  function commitEdit() {
+    if (!editing) return;
+    const v = parseFloat(editing.value);
+    if (Number.isFinite(v)) useStore.getState().updateRoom(editing.id, { temp: v, measured: true });
+    setEditing(null);
+  }
+
   function onDoubleClick(ev: React.MouseEvent) {
     const s = useStore.getState();
     const p = toCanvas(ev);
@@ -157,6 +191,12 @@ export function FloorPlanCanvas({ air, fanSpots }: Props) {
       const a = roomById(doc.rooms, d.roomA),
         b = roomById(doc.rooms, d.roomB);
       s.flash(`${a?.name} ↔ ${b?.name} door is now ${d.open ? "SHUT" : "OPEN"}.`);
+      return;
+    }
+    const r = hitRoom(p);
+    if (r) {
+      s.select({ type: "room", id: r.id });
+      openEditor(r);
     }
   }
 
@@ -176,16 +216,36 @@ export function FloorPlanCanvas({ air, fanSpots }: Props) {
   }
 
   return (
-    <canvas
-      ref={canvasRef}
-      className="floorplan-canvas"
-      width={CW}
-      height={CH}
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
-      onDoubleClick={onDoubleClick}
-      onContextMenu={onContextMenu}
-    />
+    <>
+      <canvas
+        ref={canvasRef}
+        className="floorplan-canvas"
+        width={CW}
+        height={CH}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onDoubleClick={onDoubleClick}
+        onContextMenu={onContextMenu}
+      />
+      {editing && (
+        <div className="temp-edit" style={{ left: editing.left, top: editing.top }}>
+          <input
+            type="number"
+            step={0.5}
+            autoFocus
+            value={editing.value}
+            placeholder="°C"
+            onChange={(e) => setEditing({ ...editing, value: e.target.value })}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") commitEdit();
+              else if (e.key === "Escape") setEditing(null);
+            }}
+            onBlur={commitEdit}
+          />
+          <span>°C</span>
+        </div>
+      )}
+    </>
   );
 }

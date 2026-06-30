@@ -15,8 +15,12 @@ export interface Room {
   y: number;
   w: number;
   h: number;
-  /** Measured indoor temperature, °C. */
+  /** Last known indoor temperature, °C. Only trusted as a reading when `measured` is true. */
   temp: number;
+  /** True = `temp` is a real thermometer reading. False/undefined = no sensor, estimate it. */
+  measured?: boolean;
+  /** Per-room comfort target, °C. Null/undefined falls back to the document default. */
+  target?: number | null;
 }
 
 /** A window opening on one wall of a room. Named WindowItem to avoid the DOM `Window`. */
@@ -51,11 +55,16 @@ export interface Door {
 export interface Doc {
   location: LatLon | null;
   northDeg: number;
+  /** Default comfort target, °C — used for any room without its own `target`. */
   comfort: number;
   /** Ceiling height, metres (drives the stack effect). */
   ceilingH: number;
   /** Number of portable fans the user owns. */
   fanCount: number;
+  /** Map scale: canvas pixels per real-world metre. */
+  pxPerM: number;
+  /** Can the user seal a fan into a window opening? Most cheap fans can't. */
+  canSealFan: boolean;
   rooms: Room[];
   windows: WindowItem[];
   doors: Door[];

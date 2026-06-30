@@ -10,7 +10,8 @@ import {
   windowMid,
   windowSegment,
 } from "../../lib/geometry";
-import { maxIndoor, nowHour, sunOnWindow, ventilate } from "../../lib/recommend";
+import { maxIndoor, nowHour, roomTarget, sunOnWindow, ventilate } from "../../lib/recommend";
+import type { RoomTempMap } from "../../lib/temps";
 
 const COLORS = {
   grid: "#152234",
@@ -35,12 +36,13 @@ export interface DrawOpts {
   air: AirflowResult | null;
   fanSpots: FanSpot[];
   selection: Selection;
+  temps: RoomTempMap;
 }
 
 export function drawScene(ctx: CanvasRenderingContext2D, o: DrawOpts) {
-  const { width, height, doc, weather, air, fanSpots, selection } = o;
+  const { width, height, doc, weather, air, fanSpots, selection, temps } = o;
   const h = nowHour(weather);
-  const comfort = +doc.comfort;
+  const pxPerM = doc.pxPerM || 50;
   ctx.clearRect(0, 0, width, height);
 
   // grid
@@ -79,10 +81,29 @@ export function drawScene(ctx: CanvasRenderingContext2D, o: DrawOpts) {
     ctx.fillStyle = COLORS.textBright;
     ctx.font = "600 13px system-ui";
     ctx.fillText(r.name, r.x + 8, r.y + 18);
+
+    // dimensions in metres (top-right of the room)
+    if (pxPerM > 0 && r.w > 70) {
+      ctx.fillStyle = COLORS.textMuted;
+      ctx.font = "10px system-ui";
+      ctx.textAlign = "right";
+      ctx.fillText(`${(r.w / pxPerM).toFixed(1)}×${(r.h / pxPerM).toFixed(1)} m`, r.x + r.w - 6, r.y + 15);
+      ctx.textAlign = "start";
+    }
+
     const t = +r.temp;
-    ctx.fillStyle = t >= comfort ? "#ff9d8f" : "#7fe0bd";
+    const target = roomTarget(doc, r);
+    const est = temps[r.id]?.estimated;
+    ctx.fillStyle = t >= target ? "#ff9d8f" : "#7fe0bd";
     ctx.font = "700 16px system-ui";
-    ctx.fillText((isFinite(t) ? t.toFixed(1) : "—") + "°", r.x + 8, r.y + 38);
+    const tlabel = (isFinite(t) ? (est ? "~" : "") + t.toFixed(1) : "—") + "°";
+    ctx.fillText(tlabel, r.x + 8, r.y + 38);
+    if (est && isFinite(t)) {
+      const wpx = ctx.measureText(tlabel).width;
+      ctx.fillStyle = COLORS.textMuted;
+      ctx.font = "italic 10px system-ui";
+      ctx.fillText("est.", r.x + 13 + wpx, r.y + 37);
+    }
     if (air && air.active) {
       const tag = air.flowRooms.has(r.id)
         ? "✓ cross-flow"
@@ -111,10 +132,11 @@ export function drawScene(ctx: CanvasRenderingContext2D, o: DrawOpts) {
     if (h) {
       const r = roomById(doc.rooms, w.roomId);
       const indoorT = r ? +r.temp : maxIndoor(doc.rooms);
+      const target = r ? roomTarget(doc, r) : +doc.comfort;
       const outdoorT = w.temp != null ? +w.temp : h.temp;
       const sunHit = sunOnWindow(w, h.sun, doc.northDeg) && h.rad > 120;
       if (sunHit) color = COLORS.sun;
-      else if (ventilate(outdoorT, indoorT, comfort)) color = COLORS.good;
+      else if (ventilate(outdoorT, indoorT, target)) color = COLORS.good;
       else color = COLORS.warn;
     }
     ctx.strokeStyle = color;
@@ -149,6 +171,45 @@ export function drawScene(ctx: CanvasRenderingContext2D, o: DrawOpts) {
   drawGhostFans(ctx, fanSpots, doc.fanCount || 0);
   drawCompass(ctx, doc.northDeg, width);
   drawSun(ctx, doc.northDeg, h, width);
+  drawScaleBar(ctx, pxPerM, width, height);
+}
+
+/** Pick a round number of metres (1/2/5 × 10ⁿ) whose bar is ≈ targetPx wide. */
+function niceMeters(targetPx: number, pxPerM: number): number {
+  const rawM = targetPx / pxPerM;
+  const pow = Math.pow(10, Math.floor(Math.log10(rawM)));
+  let m = pow;
+  for (const c of [1, 2, 5, 10]) if (c * pow <= rawM) m = c * pow;
+  return m;
+}
+
+function drawScaleBar(ctx: CanvasRenderingContext2D, pxPerM: number, width: number, height: number) {
+  if (!(pxPerM > 0)) return;
+  const m = niceMeters(130, pxPerM);
+  const barPx = m * pxPerM;
+  const x2 = width - 22,
+    x1 = x2 - barPx,
+    y = height - 24;
+  ctx.save();
+  // legibility backing
+  ctx.fillStyle = "rgba(11,18,25,.7)";
+  ctx.fillRect(x1 - 10, y - 22, barPx + 20, 32);
+  ctx.strokeStyle = "#cfe0f0";
+  ctx.fillStyle = "#cfe0f0";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(x1, y);
+  ctx.lineTo(x2, y);
+  ctx.moveTo(x1, y - 5);
+  ctx.lineTo(x1, y + 5);
+  ctx.moveTo(x2, y - 5);
+  ctx.lineTo(x2, y + 5);
+  ctx.stroke();
+  ctx.font = "700 11px system-ui";
+  ctx.textAlign = "center";
+  ctx.fillText(`${m} m`, (x1 + x2) / 2, y - 8);
+  ctx.textAlign = "start";
+  ctx.restore();
 }
 
 function arrowHead(ctx: CanvasRenderingContext2D, a: Pt, b: Pt) {

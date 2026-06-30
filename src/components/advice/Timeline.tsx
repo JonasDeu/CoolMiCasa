@@ -1,10 +1,11 @@
 import { useStore } from "../../store/useStore";
+import { useDerived } from "../../state/derived";
 import { compassName, windowFacing } from "../../lib/geometry";
 import { classifyHour, fmt, maxIndoor, sunOnWindow } from "../../lib/recommend";
 import type { Hour } from "../../types";
 
 export function Timeline() {
-  const doc = useStore((s) => s.doc);
+  const { docEff: doc } = useDerived();
   const weather = useStore((s) => s.weather);
 
   if (!weather || doc.rooms.length === 0)

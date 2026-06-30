@@ -1,4 +1,5 @@
 import { useStore } from "../../store/useStore";
+import { useDerived } from "../../state/derived";
 import {
   compassName,
   roomById,
@@ -7,6 +8,7 @@ import {
   winSill,
   winTop,
 } from "../../lib/geometry";
+import { fmt } from "../../lib/recommend";
 import type { Side } from "../../types";
 import { Card, Hint } from "../ui";
 
@@ -15,6 +17,7 @@ const SIDE_LABEL: Record<Side, string> = { N: "top", E: "right", S: "bottom", W:
 export function SelectionCard() {
   const selection = useStore((s) => s.selection);
   const doc = useStore((s) => s.doc);
+  const { temps } = useDerived();
   const updateRoom = useStore((s) => s.updateRoom);
   const updateWindow = useStore((s) => s.updateWindow);
   const updateDoor = useStore((s) => s.updateDoor);
@@ -31,18 +34,55 @@ export function SelectionCard() {
   if (selection.type === "room") {
     const r = roomById(doc.rooms, selection.id);
     if (!r) return null;
+    const hasSensor = r.measured !== false;
+    const estimate = temps[r.id];
+    const pxPerM = doc.pxPerM || 50;
     return (
       <Card title="Selected room">
         <label>Room name</label>
         <input type="text" value={r.name} onChange={(e) => updateRoom(r.id, { name: e.target.value })} />
-        <label>Measured temperature (°C)</label>
+
+        <label className="checkbox">
+          <input
+            type="checkbox"
+            checked={hasSensor}
+            onChange={(e) => updateRoom(r.id, { measured: e.target.checked })}
+          />{" "}
+          I have a thermometer in this room
+        </label>
+
+        {hasSensor ? (
+          <>
+            <label>Measured temperature (°C)</label>
+            <input
+              type="number"
+              step={0.5}
+              value={Number.isFinite(r.temp) ? r.temp : ""}
+              onChange={(e) => updateRoom(r.id, { temp: parseFloat(e.target.value) })}
+            />
+            <Hint>Or double-click the room on the map to type it there.</Hint>
+          </>
+        ) : (
+          <Hint>
+            No sensor → estimated at <b>~{estimate ? fmt(estimate.value) : "—"}°</b> from your measured rooms and the sun.
+            Tick the box above if you can measure it.
+          </Hint>
+        )}
+
+        <label>Target temperature (°C)</label>
         <input
           type="number"
           step={0.5}
-          value={Number.isFinite(r.temp) ? r.temp : ""}
-          onChange={(e) => updateRoom(r.id, { temp: parseFloat(e.target.value) })}
+          value={r.target == null ? "" : r.target}
+          placeholder={`default ${doc.comfort}°`}
+          onChange={(e) => updateRoom(r.id, { target: e.target.value === "" ? null : parseFloat(e.target.value) })}
         />
-        <Hint>Tip: name your corridor “Hallway” so airflow advice routes through it.</Hint>
+        <Hint>Blank = use the default ({doc.comfort}°). A bedroom you want cooler at night can have its own target.</Hint>
+
+        <Hint>
+          Size: <b>{(r.w / pxPerM).toFixed(1)} × {(r.h / pxPerM).toFixed(1)} m</b>. Name a corridor “Hallway” so airflow
+          routes through it.
+        </Hint>
         {del}
       </Card>
     );
