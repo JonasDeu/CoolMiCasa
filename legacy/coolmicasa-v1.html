@@ -1,0 +1,1324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>CoolMiCasa — Passive cooling helper</title>
+<style>
+  :root{
+    --bg:#0f1720; --panel:#16212e; --panel2:#1d2b3a; --line:#2a3a4d;
+    --txt:#e7eef6; --muted:#8aa0b6; --accent:#5ec6ff; --warn:#ffb03a;
+    --cool:#37d39a; --hot:#ff6b5e; --sun:#ffd34d; --shade:#9b8cff;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    background:var(--bg);color:var(--txt);
+    font:14px/1.45 system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+  }
+  h1{font-size:18px;margin:0}
+  h2{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0 0 8px}
+  header{
+    display:flex;align-items:center;gap:12px;padding:10px 16px;
+    background:var(--panel);border-bottom:1px solid var(--line)
+  }
+  header .logo{font-size:20px}
+  header .sub{color:var(--muted);font-size:12px}
+  .app{display:grid;grid-template-columns:280px 1fr 340px;gap:0;height:calc(100% - 53px)}
+  .col{overflow:auto;padding:14px;border-right:1px solid var(--line)}
+  .col:last-child{border-right:none}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:12px}
+  label{display:block;color:var(--muted);font-size:12px;margin:8px 0 3px}
+  input,select,button{font:inherit;color:var(--txt)}
+  input[type=text],input[type=number],select{
+    width:100%;background:var(--panel2);border:1px solid var(--line);
+    border-radius:7px;padding:7px 9px;outline:none
+  }
+  input[type=range]{width:100%}
+  button{
+    background:var(--panel2);border:1px solid var(--line);border-radius:7px;
+    padding:7px 10px;cursor:pointer;transition:.12s
+  }
+  button:hover{border-color:var(--accent)}
+  button.primary{background:var(--accent);color:#04263a;border-color:var(--accent);font-weight:600}
+  button.danger{border-color:#5a2c2c}
+  button.danger:hover{border-color:var(--hot)}
+  .btnrow{display:flex;gap:6px;flex-wrap:wrap}
+  .tool{flex:1;min-width:62px;text-align:center;padding:9px 6px}
+  .tool.active{background:var(--accent);color:#04263a;border-color:var(--accent);font-weight:600}
+  .row{display:flex;gap:8px;align-items:center}
+  .row > *{flex:1}
+  .hint{color:var(--muted);font-size:12px;margin-top:6px}
+  canvas{display:block;width:100%;background:#0b1219;border-radius:10px;border:1px solid var(--line);touch-action:none}
+  .canvasWrap{position:relative}
+  .legend{display:flex;flex-wrap:wrap;gap:10px;margin-top:8px;font-size:12px;color:var(--muted)}
+  .swatch{display:inline-block;width:11px;height:11px;border-radius:3px;vertical-align:-1px;margin-right:4px}
+  .pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:600}
+  .pill.open{background:rgba(55,211,154,.18);color:var(--cool)}
+  .pill.closed{background:rgba(255,176,58,.18);color:var(--warn)}
+  .pill.shade{background:rgba(155,140,255,.18);color:var(--shade)}
+  .rec{border:1px solid var(--line);border-radius:9px;padding:10px;margin-bottom:9px;background:var(--panel2)}
+  .rec .ttl{font-weight:600;margin-bottom:4px;display:flex;justify-content:space-between;gap:8px}
+  .rec ul{margin:6px 0 0;padding-left:18px}
+  .rec li{margin:3px 0}
+  .big{font-size:15px}
+  .statusbig{font-size:22px;font-weight:700;margin:2px 0}
+  .muted{color:var(--muted)}
+  .timeline{display:flex;gap:2px;height:64px;align-items:flex-end;margin-top:6px}
+  .tcol{flex:1;min-width:0;position:relative;display:flex;flex-direction:column;justify-content:flex-end;height:100%;border-radius:3px;overflow:hidden;cursor:default}
+  .tcol .bar{width:100%}
+  .tlabels{display:flex;gap:2px;margin-top:2px}
+  .tlabels span{flex:1;text-align:center;font-size:9px;color:var(--muted);overflow:hidden}
+  .selItem{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--line)}
+  .selItem:last-child{border-bottom:none}
+  .tag{font-size:11px;color:var(--muted)}
+  .weatherline{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-top:4px}
+  .kpi{display:flex;gap:10px;flex-wrap:wrap}
+  .kpi div{flex:1;min-width:80px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px;text-align:center}
+  .kpi .v{font-size:18px;font-weight:700}
+  .kpi .l{font-size:11px;color:var(--muted)}
+  a{color:var(--accent)}
+  .results{background:var(--panel2);border:1px solid var(--line);border-radius:7px;margin-top:4px;max-height:160px;overflow:auto}
+  .results div{padding:6px 9px;cursor:pointer}
+  .results div:hover{background:var(--panel)}
+  details summary{cursor:pointer;color:var(--muted)}
+  .warnbox{background:rgba(255,176,58,.12);border:1px solid var(--warn);border-radius:8px;padding:8px;font-size:12px;margin-bottom:10px}
+</style>
+</head>
+<body>
+<header>
+  <span class="logo">🏠❄️</span>
+  <div>
+    <h1>CoolMiCasa</h1>
+    <div class="sub">Passive cooling helper — no AC required</div>
+  </div>
+  <div style="margin-left:auto" class="btnrow">
+    <button id="btnHelp">How it works</button>
+    <button id="btnReset" class="danger">Reset</button>
+  </div>
+</header>
+
+<div class="app">
+  <!-- LEFT: setup & tools -->
+  <div class="col" id="leftcol">
+    <div class="card">
+      <h2>Location</h2>
+      <div class="row">
+        <input type="text" id="locInput" placeholder="City, e.g. Berlin" style="flex:2"/>
+        <button id="locSearch" style="flex:0 0 auto">Find</button>
+      </div>
+      <div id="locResults" class="results" style="display:none"></div>
+      <button id="locGeo" style="margin-top:6px;width:100%">📍 Use my current location</button>
+      <div id="locShow" class="hint"></div>
+    </div>
+
+    <div class="card">
+      <h2>Comfort</h2>
+      <label>Target indoor temperature (°C)</label>
+      <input type="number" id="comfort" value="24" step="0.5"/>
+      <div class="hint">Rooms above this should be cooled; below it, keep the heat out.</div>
+    </div>
+
+    <div class="card">
+      <h2>Orientation</h2>
+      <label>Rotate North (where “up” on the map points): <span id="northVal">0°</span></label>
+      <input type="range" id="north" min="0" max="359" value="0"/>
+      <div class="hint">Drag so the compass matches your flat. East gets morning sun, West the hot evening sun.</div>
+    </div>
+
+    <div class="card">
+      <h2>Dimensions</h2>
+      <label>Ceiling height (m)</label>
+      <input type="number" id="ceiling" step="0.1" min="2" value="2.5"/>
+      <div class="hint">Used for the stack effect: a taller room (and a bigger gap between low intake and high exhaust) gives a stronger natural draft. Set each window's sill/height when you select it.</div>
+    </div>
+
+    <div class="card">
+      <h2>Portable fans</h2>
+      <label>How many fans do you have to move around?</label>
+      <input type="number" id="fancount" step="1" min="0" max="8" value="2"/>
+      <div class="hint">The app picks the best spot &amp; height for each one (highest-impact first) — shown as numbered dashed ghosts on the map and listed in <b>Airflow &amp; fan plan</b>.</div>
+    </div>
+
+    <div class="card">
+      <h2>Draw your flat</h2>
+      <div class="btnrow">
+        <button class="tool active" data-tool="select">✋ Select</button>
+        <button class="tool" data-tool="room">▭ Room</button>
+        <button class="tool" data-tool="window">▥ Window</button>
+        <button class="tool" data-tool="door">🚪 Door</button>
+      </div>
+      <div class="hint" id="toolHint">Click a room or window to edit it. Drag to move; drag the corner to resize.</div>
+    </div>
+
+    <div class="card" id="selCard" style="display:none">
+      <h2>Selected</h2>
+      <div id="selBody"></div>
+      <button class="danger" id="delSel" style="width:100%;margin-top:8px">🗑 Delete this</button>
+      <div class="hint">Or press <b>Del</b>. Right-click any window/door/fan on the map to delete it instantly. <b>Ctrl+Z</b> undoes.</div>
+    </div>
+  </div>
+
+  <!-- CENTER: canvas -->
+  <div class="col" id="centercol">
+    <div class="canvasWrap">
+      <canvas id="cv" width="900" height="620"></canvas>
+    </div>
+    <div class="legend">
+      <span><span class="swatch" style="background:var(--cool)"></span>Open window (ventilate)</span>
+      <span><span class="swatch" style="background:var(--warn)"></span>Keep closed</span>
+      <span><span class="swatch" style="background:var(--sun)"></span>In direct sun → shade it</span>
+      <span><span class="swatch" style="background:var(--shade)"></span>Window (blue °C = temp you measured outside it)</span>
+      <span><span class="swatch" style="background:var(--cool)"></span>Door OPEN</span>
+      <span><span class="swatch" style="background:var(--hot)"></span>Door SHUT</span>
+      <span><span class="swatch" style="background:var(--accent)"></span>Airflow path</span>
+      <span>🌀 Fan spot (numbered by priority; bright = use your fans, grey = extra)</span>
+    </div>
+    <div class="hint" id="canvasMsg"></div>
+  </div>
+
+  <!-- RIGHT: advice -->
+  <div class="col" id="rightcol">
+    <div class="card">
+      <h2>Right now</h2>
+      <div id="warnArea"></div>
+      <div class="statusbig" id="nowStatus">Set a location to begin</div>
+      <div class="kpi" id="nowKpi"></div>
+      <div class="weatherline" id="windLine"></div>
+    </div>
+
+    <div class="card">
+      <h2>Do this now</h2>
+      <div id="actions"><div class="muted">Add rooms, set temperatures and a location to get advice.</div></div>
+    </div>
+
+    <div class="card">
+      <h2>Airflow &amp; fan plan</h2>
+      <div id="fanplan"><div class="muted">Connect rooms with the Door tool to model how air moves through your flat.</div></div>
+    </div>
+
+    <div class="card">
+      <h2>Next 24 hours</h2>
+      <div class="timeline" id="timeline"></div>
+      <div class="tlabels" id="tlabels"></div>
+      <div id="timelineSummary" style="margin-top:8px"></div>
+      <div class="legend">
+        <span><span class="swatch" style="background:var(--cool)"></span>Ventilate</span>
+        <span><span class="swatch" style="background:var(--warn)"></span>Seal up</span>
+        <span><span class="swatch" style="background:var(--sun)"></span>Sun on glass</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<dialog id="helpDlg" style="max-width:620px;background:var(--panel);color:var(--txt);border:1px solid var(--line);border-radius:12px;padding:20px">
+  <h1>How CoolMiCasa works</h1>
+  <p>The trick to cooling a flat without AC is timing: <b>let cool air in only when it's cooler outside than inside</b>, and <b>seal the place up and block the sun</b> the rest of the time.</p>
+  <ol>
+    <li><b>Set your location</b> — fetches the real hourly outdoor temperature, sun, and wind for your spot (via the free Open-Meteo API).</li>
+    <li><b>Draw your flat</b> — add rooms (include the hallway), place windows on walls with the Window tool, then use the <b>Door</b> tool to connect adjacent rooms. Doors let the app trace how air flows from room to room.</li>
+    <li><b>Read the airflow</b> — when it's cooler outside, blue arrows show the cross-breeze path (intake window → through open doors → exhaust window). Rooms off the path are flagged stagnant.</li>
+    <li><b>Say how many portable fans you have</b> — the app ranks the best spots and heights for exactly that many: exhaust high where hot air pools (stack effect), intake low for cool night air, and a doorway booster where air accelerates through the constriction (Bernoulli/continuity). Numbered dashed ghosts on the map show where each fan goes.</li>
+    <li><b>Rotate North</b> so the compass matches reality. The app computes exactly which windows the sun hits, hour by hour.</li>
+    <li><b>Type the temperature</b> you measure in each room (and optionally right at a window).</li>
+    <li>Read the <b>Right now</b> and <b>Next 24h</b> panels. Green = open & ventilate, orange = keep closed, yellow = sun is hitting that glass so close the shade.</li>
+  </ol>
+  <p class="hint">Everything is saved in your browser. No account, nothing leaves your machine except the weather lookup.</p>
+  <button class="primary" id="helpClose" style="margin-top:8px">Got it</button>
+</dialog>
+
+<script>
+"use strict";
+/* ------------------------------------------------------------------ */
+/* State + persistence                                                 */
+/* ------------------------------------------------------------------ */
+const SKEY = "coolmicasa.v1";
+let idc = 1; function id(){ return "x"+(idc++)+"-"+Math.floor(performance.now()).toString(36); }
+const defaultState = () => ({
+  location:null,                 // {name,lat,lon}
+  northDeg:0,
+  comfort:24,
+  ceilingH:2.5,                  // room/ceiling height in metres (for stack effect)
+  fanCount:2,                    // how many portable fans you own
+  rooms:[],                      // {id,name,x,y,w,h,temp}
+  windows:[],                    // {id,roomId,side,pos,len,shade,temp,sill,winH}
+  doors:[],                      // {id,roomA,roomB,x,y,open}
+  fans:[],                       // (legacy; static fan markers no longer used)
+});
+let state = load();
+function load(){
+  try{ const s = JSON.parse(localStorage.getItem(SKEY)); if(s&&s.rooms){ const st=Object.assign(defaultState(),s); st.fans=[]; return st; } }catch(e){}
+  return seed();
+}
+function save(){ try{ localStorage.setItem(SKEY, JSON.stringify(state)); }catch(e){} }
+function seed(){
+  // A small starter flat so the canvas isn't empty.
+  const s = defaultState();
+  s.rooms = [
+    {id:id(),name:"Living room",x:90,y:70,w:260,h:200,temp:27},
+    {id:id(),name:"Bedroom",x:90,y:300,w:200,h:170,temp:26},
+    {id:id(),name:"Hallway",x:360,y:120,w:120,h:330,temp:26},
+    {id:id(),name:"Kitchen",x:490,y:120,w:200,h:150,temp:28},
+  ];
+  const lr=s.rooms[0], br=s.rooms[1], hw=s.rooms[2], k=s.rooms[3];
+  s.windows = [
+    {id:id(),roomId:lr.id,side:"W",pos:.5,len:90,shade:true,temp:null},
+    {id:id(),roomId:lr.id,side:"N",pos:.5,len:80,shade:true,temp:null},
+    {id:id(),roomId:br.id,side:"W",pos:.5,len:80,shade:true,temp:null},
+    {id:id(),roomId:k.id,side:"E",pos:.5,len:80,shade:true,temp:null},
+  ];
+  s.doors = [
+    {id:id(),roomA:lr.id,roomB:hw.id,x:355,y:200,open:true},   // living ↔ hallway
+    {id:id(),roomA:hw.id,roomB:k.id, x:485,y:200,open:true},   // hallway ↔ kitchen
+    {id:id(),roomA:lr.id,roomB:br.id,x:190,y:285,open:true},   // living ↔ bedroom
+  ];
+  return s;
+}
+
+/* ------------------------------------------------------------------ */
+/* Weather (Open-Meteo, no key needed)                                 */
+/* ------------------------------------------------------------------ */
+let weather = null;  // {tz,offset, hours:[{iso,hour,temp,rad,windSpd,windDir}], current:{...}, nowIdx}
+async function geocode(q){
+  const r = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=6&language=en&format=json`);
+  const j = await r.json();
+  return (j.results||[]).map(x=>({name:[x.name,x.admin1,x.country_code].filter(Boolean).join(", "),lat:x.latitude,lon:x.longitude}));
+}
+async function fetchWeather(){
+  if(!state.location){ weather=null; return; }
+  const {lat,lon}=state.location;
+  const url=`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}`+
+    `&hourly=temperature_2m,relative_humidity_2m,shortwave_radiation,wind_speed_10m,wind_direction_10m`+
+    `&current=temperature_2m,relative_humidity_2m,wind_speed_10m,wind_direction_10m,is_day`+
+    `&timezone=auto&forecast_days=2`;
+  const r=await fetch(url); const j=await r.json();
+  const offset=j.utc_offset_seconds||0;
+  const H=j.hourly, hours=[];
+  for(let i=0;i<H.time.length;i++){
+    const iso=H.time[i];
+    const realDate=new Date(Date.parse(iso+"Z")-offset*1000); // true UTC instant
+    hours.push({
+      iso, hour:parseInt(iso.slice(11,13),10), date:realDate,
+      temp:H.temperature_2m[i], rh:H.relative_humidity_2m[i],
+      rad:H.shortwave_radiation[i], windSpd:H.wind_speed_10m[i], windDir:H.wind_direction_10m[i],
+      sun:sunPosition(realDate,lat,lon),
+    });
+  }
+  // current index
+  const cIso=j.current.time;
+  let nowIdx=hours.findIndex(h=>h.iso.slice(0,13)===cIso.slice(0,13));
+  if(nowIdx<0) nowIdx=0;
+  weather={tz:j.timezone,offset,hours,nowIdx,current:{
+    temp:j.current.temperature_2m, rh:j.current.relative_humidity_2m,
+    windSpd:j.current.wind_speed_10m, windDir:j.current.wind_direction_10m, isDay:j.current.is_day,
+    sun:hours[nowIdx]?hours[nowIdx].sun:null,
+  }};
+}
+
+/* ------------------------------------------------------------------ */
+/* Solar position (SunCalc-style), compass azimuth from North          */
+/* ------------------------------------------------------------------ */
+function sunPosition(date, lat, lon){
+  const rad=Math.PI/180, dayMs=864e5, J1970=2440588, J2000=2451545;
+  const toDays=d=>(d.valueOf()/dayMs-0.5+J1970)-J2000;
+  const e=rad*23.4397;
+  const d=toDays(date);
+  const M=rad*(357.5291+0.98560028*d);
+  const C=rad*(1.9148*Math.sin(M)+0.02*Math.sin(2*M)+0.0003*Math.sin(3*M));
+  const L=M+C+rad*102.9372+Math.PI;
+  const dec=Math.asin(Math.sin(0)*Math.cos(e)+Math.cos(0)*Math.sin(e)*Math.sin(L));
+  const ra=Math.atan2(Math.sin(L)*Math.cos(e),Math.cos(L));
+  const lw=rad*-lon, phi=rad*lat;
+  const theta=rad*(280.16+360.9856235*d)-lw;
+  const Hh=theta-ra;
+  const alt=Math.asin(Math.sin(phi)*Math.sin(dec)+Math.cos(phi)*Math.cos(dec)*Math.cos(Hh));
+  const az=Math.atan2(Math.sin(Hh),Math.cos(Hh)*Math.sin(phi)-Math.tan(dec)*Math.cos(phi)); // from south
+  return { azimuth:((az/rad+180)%360+360)%360, altitude:alt/rad };
+}
+
+/* ------------------------------------------------------------------ */
+/* Geometry helpers                                                    */
+/* ------------------------------------------------------------------ */
+const SIDE_OFFSET={N:0,E:90,S:180,W:270};
+const COMPASS=["N","NE","E","SE","S","SW","W","NW"];
+function compassName(deg){ return COMPASS[Math.round(((deg%360)+360)%360/45)%8]; }
+function windowFacing(win){ return (((state.northDeg+SIDE_OFFSET[win.side])%360)+360)%360; }
+function angDiff(a,b){ let d=Math.abs(a-b)%360; return d>180?360-d:d; }
+function roomById(rid){ return state.rooms.find(r=>r.id===rid); }
+// outward-facing endpoints of a window segment on its room wall
+function windowSegment(win){
+  const r=roomById(win.roomId); if(!r) return null;
+  const half=win.len/2;
+  if(win.side==="N"){const cx=r.x+win.pos*r.w; return {x1:cx-half,y1:r.y,x2:cx+half,y2:r.y};}
+  if(win.side==="S"){const cx=r.x+win.pos*r.w; return {x1:cx-half,y1:r.y+r.h,x2:cx+half,y2:r.y+r.h};}
+  if(win.side==="W"){const cy=r.y+win.pos*r.h; return {x1:r.x,y1:cy-half,x2:r.x,y2:cy+half};}
+  const cy=r.y+win.pos*r.h; return {x1:r.x+r.w,y1:cy-half,x2:r.x+r.w,y2:cy+half};
+}
+function windowMid(win){ const s=windowSegment(win); return s?{x:(s.x1+s.x2)/2,y:(s.y1+s.y2)/2}:null; }
+// vertical geometry (metres above floor) — defaults keep old saved windows working
+function winSill(w){ return w.sill!=null? +w.sill : 0.9; }
+function winHeight(w){ return w.winH!=null? +w.winH : 1.1; }
+function winTop(w){ return Math.min(winSill(w)+winHeight(w), state.ceilingH||2.5); }
+function winArea(w){ return w.len * winHeight(w); }   // px·m proxy for opening size
+function roomCenter(r){ return {x:r.x+r.w/2, y:r.y+r.h/2}; }
+function outwardVec(side){ return {N:{x:0,y:-1},S:{x:0,y:1},W:{x:-1,y:0},E:{x:1,y:0}}[side]; }
+// shortest distance from point p to a room rectangle (0 if inside)
+function rectDist(r,p){
+  const dx=Math.max(r.x-p.x,0,p.x-(r.x+r.w)), dy=Math.max(r.y-p.y,0,p.y-(r.y+r.h));
+  return Math.hypot(dx,dy);
+}
+// the two nearest rooms to a click, for placing a door between them
+function twoNearestRooms(p){
+  const ranked=state.rooms.map(r=>({r,d:rectDist(r,p)})).sort((a,b)=>a.d-b.d);
+  return ranked.slice(0,2).map(x=>x.r);
+}
+function doorById(did){ return state.doors.find(d=>d.id===did); }
+function doorBetween(a,b){ return state.doors.find(d=>(d.roomA===a&&d.roomB===b)||(d.roomA===b&&d.roomB===a)); }
+// the wall two rooms share: which axis it runs on, its coordinate, and the valid span (lo..hi)
+function sharedWall(a,b){
+  const ax2=a.x+a.w, ay2=a.y+a.h, bx2=b.x+b.w, by2=b.y+b.h;
+  const sepX=Math.max(b.x-ax2, a.x-bx2);   // >0 gap, <0 overlap (horizontal)
+  const sepY=Math.max(b.y-ay2, a.y-by2);   // >0 gap, <0 overlap (vertical)
+  if(sepX>=sepY){ // rooms are left/right neighbours -> vertical wall
+    return { vertical:true, coord:(a.x<b.x?(ax2+b.x):(bx2+a.x))/2,
+             lo:Math.max(a.y,b.y), hi:Math.min(ay2,by2) };
+  }
+  return { vertical:false, coord:(a.y<b.y?(ay2+b.y):(by2+a.y))/2,
+           lo:Math.max(a.x,b.x), hi:Math.min(ax2,bx2) };
+}
+// snap a click/drag point onto the shared wall, clamped to the opening span
+function snapDoorPos(a,b,p){
+  if(!a||!b) return {x:p.x,y:p.y};
+  const w=sharedWall(a,b);
+  if(w.hi-w.lo>6){
+    const m=Math.min(14,(w.hi-w.lo)/2-1);
+    if(w.vertical) return { x:w.coord, y:Math.max(w.lo+m, Math.min(p.y, w.hi-m)) };
+    return { x:Math.max(w.lo+m, Math.min(p.x, w.hi-m)), y:w.coord };
+  }
+  // rooms don't overlap on that axis (diagonal) -> midpoint of nearest points
+  const nax=Math.max(a.x,Math.min(p.x,a.x+a.w)), nay=Math.max(a.y,Math.min(p.y,a.y+a.h));
+  const nbx=Math.max(b.x,Math.min(p.x,b.x+b.w)), nby=Math.max(b.y,Math.min(p.y,b.y+b.h));
+  return { x:(nax+nbx)/2, y:(nay+nby)/2 };
+}
+// keep a room's doors glued to their shared walls after the room moves/resizes
+function resnapDoorsForRoom(rid){
+  state.doors.forEach(d=>{ if(d.roomA===rid||d.roomB===rid){
+    const a=roomById(d.roomA), b=roomById(d.roomB);
+    if(a&&b){ const pos=snapDoorPos(a,b,{x:d.x,y:d.y}); d.x=pos.x; d.y=pos.y; } } });
+}
+
+/* ------------------------------------------------------------------ */
+/* Recommendation engine                                               */
+/* ------------------------------------------------------------------ */
+function maxIndoor(){ return state.rooms.length? Math.max(...state.rooms.map(r=>+r.temp||0)) : null; }
+// Is opening windows beneficial at outdoorT given indoorT?
+function ventilate(outdoorT, indoorT, comfort){
+  if(outdoorT==null||indoorT==null) return false;
+  return outdoorT <= indoorT-1 && indoorT>comfort-0.5 ? true : (outdoorT <= indoorT-1 && outdoorT < comfort);
+}
+function sunOnWindow(win, sun){
+  if(!sun||sun.altitude<=1) return false;
+  return angDiff(sun.azimuth, windowFacing(win)) < 85;
+}
+// classify an hour for a representative indoor temp
+function classifyHour(h, indoorT, comfort){
+  const vent=ventilate(h.temp, indoorT, comfort);
+  let anySun=false;
+  for(const w of state.windows){ if(sunOnWindow(w,h.sun)&&h.rad>120){anySun=true;break;} }
+  return {vent, anySun, temp:h.temp};
+}
+// wind relationship for a window facing f, wind coming FROM windDir
+function windRole(facing, windDir, windSpd){
+  if(windSpd==null||windSpd<3) return "calm";
+  const d=angDiff(facing, windDir);
+  if(d<60) return "windward";     // wind blows into this window -> intake
+  if(d>120) return "leeward";     // -> exhaust
+  return "side";
+}
+// windows we would actually have open right now (ventilate mode, not sun-blasted)
+function openWindowsNow(){
+  const h=nowHour(); if(!h) return [];
+  const comfort=+state.comfort;
+  return state.windows.filter(w=>{
+    const r=roomById(w.roomId); const indoorT=r?+r.temp:maxIndoor();
+    const outT=w.temp!=null?+w.temp:h.temp;
+    const sunHit=sunOnWindow(w,h.sun)&&h.rad>120;
+    return !sunHit && ventilate(outT,indoorT,comfort);
+  });
+}
+
+/* ------------------------------------------------------------------ */
+/* Airflow model  (rooms = nodes, open doors / open windows = edges)   */
+/* ------------------------------------------------------------------ */
+function connectedComponents(){
+  // union rooms joined by OPEN internal doors
+  const parent={}; state.rooms.forEach(r=>parent[r.id]=r.id);
+  const find=x=>{ while(parent[x]!==x){ parent[x]=parent[parent[x]]; x=parent[x]; } return x; };
+  const uni=(a,b)=>{ const ra=find(a),rb=find(b); if(ra&&rb) parent[ra]=rb; };
+  state.doors.forEach(d=>{ if(d.open&&parent[d.roomA]!=null&&parent[d.roomB]!=null) uni(d.roomA,d.roomB); });
+  const comp={}; state.rooms.forEach(r=>{ const root=find(r.id); (comp[root]=comp[root]||[]).push(r.id); });
+  return {find, comps:comp};
+}
+// BFS room path through OPEN doors from any of starts to any of goals
+function doorPath(starts, goals){
+  const adj={}; state.rooms.forEach(r=>adj[r.id]=[]);
+  state.doors.forEach(d=>{ if(d.open&&adj[d.roomA]&&adj[d.roomB]){ adj[d.roomA].push(d.roomB); adj[d.roomB].push(d.roomA);} });
+  const goalSet=new Set(goals), seen=new Set(starts), q=starts.map(s=>[s]);
+  while(q.length){ const path=q.shift(), last=path[path.length-1];
+    if(goalSet.has(last)) return path;
+    for(const nb of adj[last]) if(!seen.has(nb)){ seen.add(nb); q.push(path.concat(nb)); }
+  }
+  return null;
+}
+function analyzeAirflow(){
+  const h=nowHour();
+  const res={ openWins:[], intakeRooms:new Set(), exhaustRooms:new Set(), flowRooms:new Set(),
+    singleRooms:new Set(), stagnant:new Set(), paths:[], doorSuggest:[], calm:false, active:false };
+  if(!h||state.rooms.length===0) return res;
+  const wd=weather.current.windDir, ws=weather.current.windSpd;
+  const openWins=openWindowsNow(); res.openWins=openWins;
+  if(openWins.length===0) return res;             // sealed: no cross-vent to model
+  res.active=true;
+  res.calm = ws==null||ws<3;
+  // classify open windows by pressure side
+  const roomsWithOpen=new Set(openWins.map(w=>w.roomId));
+  if(res.calm){
+    // no wind: use the two most-opposed open windows as the intake/exhaust pair
+    let best=null;
+    for(let i=0;i<openWins.length;i++)for(let j=i+1;j<openWins.length;j++){
+      const dd=angDiff(windowFacing(openWins[i]),windowFacing(openWins[j]));
+      if(!best||dd>best.dd) best={a:openWins[i],b:openWins[j],dd};
+    }
+    if(best&&best.dd>60){ res.intakeRooms.add(best.a.roomId); res.exhaustRooms.add(best.b.roomId); }
+  } else {
+    openWins.forEach(w=>{ const role=windRole(windowFacing(w),wd,ws);
+      if(role==="windward") res.intakeRooms.add(w.roomId);
+      else if(role==="leeward") res.exhaustRooms.add(w.roomId); });
+    // single-sided (only windward, or only leeward) — still treat the other extreme as exhaust
+    if(res.intakeRooms.size&&!res.exhaustRooms.size){ // pick most-leeward open window
+      let m=null; openWins.forEach(w=>{const d=angDiff(windowFacing(w),wd); if(!m||d>m.d)m={w,d};}); if(m) res.exhaustRooms.add(m.w.roomId);
+    } else if(!res.intakeRooms.size&&res.exhaustRooms.size){
+      let m=null; openWins.forEach(w=>{const d=angDiff(windowFacing(w),wd); if(!m||d<m.d)m={w,d};}); if(m) res.intakeRooms.add(m.w.roomId);
+    }
+  }
+  // components & flow rooms
+  const {find,comps}=connectedComponents();
+  const compHasIntake={}, compHasExhaust={}, compHasOpen={};
+  [...res.intakeRooms].forEach(r=>compHasIntake[find(r)]=true);
+  [...res.exhaustRooms].forEach(r=>compHasExhaust[find(r)]=true);
+  [...roomsWithOpen].forEach(r=>compHasOpen[find(r)]=true);
+  state.rooms.forEach(r=>{ const c=find(r.id);
+    if(compHasIntake[c]&&compHasExhaust[c]) res.flowRooms.add(r.id);
+    else if(compHasOpen[c]) res.singleRooms.add(r.id);
+    else res.stagnant.add(r.id);
+  });
+  // build visual path(s): one per exhaust room reachable from an intake room
+  const usedExhaust=new Set();
+  [...res.exhaustRooms].forEach(er=>{
+    if(usedExhaust.has(er)) return;
+    const p=doorPath([...res.intakeRooms], [er]);
+    if(p){ usedExhaust.add(er); res.paths.push(buildWaypoints(p, openWins)); }
+  });
+  // suggest opening a CLOSED door that would link an intake comp to an exhaust comp
+  state.doors.filter(d=>!d.open).forEach(d=>{
+    const cA=find(d.roomA), cB=find(d.roomB); if(cA===cB) return;
+    const givesBoth=((compHasIntake[cA]||compHasIntake[cB])&&(compHasExhaust[cA]||compHasExhaust[cB]));
+    const alreadyBoth=(compHasIntake[cA]&&compHasExhaust[cA])||(compHasIntake[cB]&&compHasExhaust[cB]);
+    if(givesBoth&&!alreadyBoth){
+      const ra=roomById(d.roomA), rb=roomById(d.roomB);
+      res.doorSuggest.push(`Open the door between <b>${esc(ra.name)}</b> and <b>${esc(rb.name)}</b> to connect the cross-breeze.`);
+    }
+  });
+  return res;
+}
+// turn a room-path into drawable waypoints: intake window → room centers via doors → exhaust window
+function buildWaypoints(roomPath, openWins){
+  const winInRoom=(rid,roleSet)=>openWins.find(w=>w.roomId===rid);
+  const pts=[];
+  const inWin=openWins.find(w=>w.roomId===roomPath[0]);
+  if(inWin) pts.push(windowMid(inWin));
+  for(let i=0;i<roomPath.length;i++){
+    pts.push(roomCenter(roomById(roomPath[i])));
+    if(i<roomPath.length-1){ const d=doorBetween(roomPath[i],roomPath[i+1]); if(d) pts.push({x:d.x,y:d.y}); }
+  }
+  const outWin=[...openWins].reverse().find(w=>w.roomId===roomPath[roomPath.length-1]&&w!==inWin) || openWins.find(w=>w.roomId===roomPath[roomPath.length-1]);
+  if(outWin) pts.push(windowMid(outWin));
+  return {roomPath, pts};
+}
+
+/* ------------------------------------------------------------------ */
+/* Fan plan — exact position + height recommendations                  */
+/* ------------------------------------------------------------------ */
+// heightM is metres above floor; descriptors explain the physics.
+function buildFanPlan(air){
+  const h=nowHour(); if(!h) return [];
+  const comfort=+state.comfort, wd=weather.current.windDir, ws=weather.current.windSpd;
+  const plan=[];
+  if(air.active){
+    const CH=state.ceilingH||2.5;
+    // 1) PRIMARY EXHAUST — leeward + HIGHEST + warmest opening; fan at the window top (stack effect)
+    let exWin=null, exScore=-1e9;
+    air.openWins.forEach(w=>{ if(!air.exhaustRooms.has(w.roomId)) return;
+      const lee=air.calm?0:angDiff(windowFacing(w),wd);
+      const r=roomById(w.roomId);
+      const score=lee*0.5 + winTop(w)*40 + (+r.temp||0);            // leeward + high + warm
+      if(score>exScore){ exScore=score; exWin=w; } });
+    if(!exWin){ air.openWins.forEach(w=>{ const s=(air.calm?0:angDiff(windowFacing(w),wd))*0.5+winTop(w)*40; if(s>exScore){exScore=s;exWin=w;} }); }
+    // INTAKE — windward + LOWEST sill + coolest air in front
+    let inWin=null, inScore=-1e9;
+    air.openWins.forEach(w=>{ if(w===exWin) return;
+      const wind=air.calm?0:(180-angDiff(windowFacing(w),wd));      // windward => high
+      const outT=w.temp!=null? +w.temp : h.temp;
+      const score=wind*0.5 - winSill(w)*40 - outT;                  // windward + low + cool
+      if(score>inScore){ inScore=score; inWin=w; } });
+
+    let exTop=null, inSill=null;
+    if(exWin){ const m=windowMid(exWin), v=outwardVec(exWin.side), r=roomById(exWin.roomId); exTop=winTop(exWin);
+      plan.push({x:m.x,y:m.y,dir:v,heightM:+exTop.toFixed(2),
+        heightName:`HIGH — in the top of the window opening (${exTop.toFixed(1)} m above floor)`,
+        label:`Box fan: ${r.name}, ${compassName(windowFacing(exWin))} window — blow OUT`,
+        why:"Your engine. Keep this one IN the window blowing out and seal the gaps around it so hot air can't loop back in. Hot air floats to the ceiling, so exhausting high harnesses the stack effect and pulls cool air in through every low opening.",
+        prio:1});
+    }
+    // 2) INTAKE fan only when calm; with wind, just keep the low intake open
+    if(inWin){ inSill=winSill(inWin);
+      if(air.calm){ const m=windowMid(inWin), v=outwardVec(inWin.side), r=roomById(inWin.roomId);
+        plan.push({x:m.x,y:m.y,dir:{x:-v.x,y:-v.y},heightM:+inSill.toFixed(2),
+          heightName:`LOW — in the window opening at the sill (${inSill.toFixed(1)} m above floor)`,
+          label:`Box fan: ${r.name}, ${compassName(windowFacing(inWin))} window — blow IN`,
+          why:"No wind, so force the intake. Keep it IN the opening (its back must face outside to grab cool air), blowing in and angled slightly down. Cool night air is dense and sinks, so this floods the floor and feeds the high exhaust.",
+          prio:2});
+      }
+    }
+    air._stack={ dH:(exTop!=null&&inSill!=null)?Math.max(0,exTop-inSill):null, exTop, inSill, exWin, inWin };
+    const usedDoors=new Set(), mh=+(CH*0.45).toFixed(2);
+    // 3) BERNOULLI / CONTINUITY BOOSTER — fan in a doorway ON the main breeze path.
+    //    Air accelerates through the constriction, so one fan there drives the whole circuit.
+    if(air.paths.length){
+      let lp=air.paths[0]; air.paths.forEach(p=>{ if(p.roomPath.length>lp.roomPath.length) lp=p; });
+      if(lp.roomPath.length>=2){
+        const i=Math.floor((lp.roomPath.length-1)/2);
+        const d=doorBetween(lp.roomPath[i], lp.roomPath[i+1]);
+        if(d&&d.open){
+          const from=roomCenter(roomById(lp.roomPath[i])), to=roomCenter(roomById(lp.roomPath[i+1]));
+          const v={x:to.x-from.x,y:to.y-from.y}; const L=Math.hypot(v.x,v.y)||1;
+          const ux=v.x/L, uy=v.y/L, back=26;
+          usedDoors.add(d.id);
+          plan.push({x:d.x-ux*back, y:d.y-uy*back, dir:{x:ux,y:uy}, heightM:mh,
+            heightName:`MID (~${mh.toFixed(1)} m) — stand it ~½ m BEFORE the doorway, aimed through it`,
+            label:`Booster fan: ${roomById(lp.roomPath[i]).name} → ${roomById(lp.roomPath[i+1]).name} doorway`,
+            why:"Don't jam it in the gap. A fan blows a tight jet but only sucks diffusely, so set it back ~½ m on the upstream side and shoot the jet through the doorway. The moving jet entrains surrounding air (jet-pump / Bernoulli effect), pushing far more through the constriction than the fan's own output.",
+            prio: air.calm?4:2});
+        }
+      }
+    }
+    // 4) RESCUE BOOSTERS — pull stagnant / one-sided rooms onto the flow path
+    [...air.singleRooms,...air.stagnant].forEach(rid=>{
+      const d=state.doors.find(dd=>(dd.roomA===rid&&air.flowRooms.has(dd.roomB))||(dd.roomB===rid&&air.flowRooms.has(dd.roomA)));
+      if(!d||usedDoors.has(d.id)) return;
+      usedDoors.add(d.id);
+      const otherId=d.roomA===rid?d.roomB:d.roomA;
+      const from=roomCenter(roomById(otherId)), to=roomCenter(roomById(rid));
+      const v={x:to.x-from.x,y:to.y-from.y}; const L=Math.hypot(v.x,v.y)||1;
+      const ux=v.x/L, uy=v.y/L, back=26;
+      plan.push({x:d.x-ux*back, y:d.y-uy*back, dir:{x:ux,y:uy}, heightM:mh,
+        heightName:`MID (~${mh.toFixed(1)} m) — ~½ m back on the breezy side, aimed through the doorway`,
+        label:`Doorway fan: push air into ${esc(roomById(rid).name)}`,
+        why:`${roomById(rid).name} is off the main breeze. ${d.open?"":"Open this door, then "}stand a fan a bit before the doorway on the ventilated side and shoot the jet through — it entrains room air and drags fresh air in. Don't block the gap with it.`,
+        prio:5});
+    });
+  } else {
+    // SEALED — personal circulation fans in the warm, occupied rooms (most impactful first)
+    const warm=state.rooms.filter(r=>(+r.temp||0)>=comfort-0.5).sort((a,b)=>(+b.temp)-(+a.temp));
+    warm.forEach((r,i)=>{ const c=roomCenter(r); const horiz=r.w>=r.h;
+      plan.push({x:c.x,y:c.y,dir:horiz?{x:1,y:0}:{x:0,y:1},heightM:1.1,
+        heightName:"SEATED height (~1.0–1.2 m), aimed at where you sit/sleep",
+        label:`Circulating fan: ${esc(r.name)} (${fmt(r.temp)}°)`,
+        why:"Windows are shut, so don't pull in hotter outside air. Moving air over skin feels ~3 °C cooler. A fan angled across a doorway also entrains and drags air from the next room (Bernoulli entrainment).",
+        prio:1+i});
+    });
+  }
+  return plan.sort((a,b)=>a.prio-b.prio).slice(0,8);
+}
+
+/* ------------------------------------------------------------------ */
+/* Canvas                                                              */
+/* ------------------------------------------------------------------ */
+const cv=document.getElementById("cv"), ctx=cv.getContext("2d");
+let tool="select", sel=null;           // sel = {type,id}
+let drag=null;                         // active drag operation
+let lastAir=null, lastPlan=[];          // cached airflow analysis + fan plan
+function toCanvas(ev){
+  const r=cv.getBoundingClientRect();
+  return { x:(ev.clientX-r.left)*cv.width/r.width, y:(ev.clientY-r.top)*cv.height/r.height };
+}
+function nowHour(){ return weather? weather.hours[weather.nowIdx] : null; }
+
+function render(){
+  ctx.clearRect(0,0,cv.width,cv.height);
+  // grid
+  ctx.strokeStyle="#152234"; ctx.lineWidth=1;
+  for(let x=0;x<cv.width;x+=30){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,cv.height);ctx.stroke();}
+  for(let y=0;y<cv.height;y+=30){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(cv.width,y);ctx.stroke();}
+  const h=nowHour(), comfort=+state.comfort, air=lastAir;
+  // rooms
+  for(const r of state.rooms){
+    const seld = sel&&sel.type==="room"&&sel.id===r.id;
+    ctx.fillStyle = "rgba(40,62,86,.55)";
+    ctx.strokeStyle = seld?"#5ec6ff":"#3a5675"; ctx.lineWidth=seld?3:2;
+    ctx.fillRect(r.x,r.y,r.w,r.h); ctx.strokeRect(r.x,r.y,r.w,r.h);
+    // airflow tint
+    if(air&&air.active){
+      if(air.flowRooms.has(r.id)){ ctx.fillStyle="rgba(94,198,255,.12)"; ctx.fillRect(r.x,r.y,r.w,r.h); }
+      else if(air.stagnant.has(r.id)){ ctx.fillStyle="rgba(255,176,58,.10)"; ctx.fillRect(r.x,r.y,r.w,r.h); }
+    }
+    // label + temp
+    ctx.fillStyle="#dfeaf5"; ctx.font="600 13px system-ui";
+    ctx.fillText(r.name, r.x+8, r.y+18);
+    const t=+r.temp;
+    ctx.fillStyle = t>=comfort?"#ff9d8f":"#7fe0bd"; ctx.font="700 16px system-ui";
+    ctx.fillText((isFinite(t)?t.toFixed(1):"—")+"°", r.x+8, r.y+38);
+    // airflow tag
+    if(air&&air.active){
+      const tag = air.flowRooms.has(r.id)?"✓ cross-flow":air.singleRooms.has(r.id)?"~ one-sided":air.stagnant.has(r.id)?"⚠ stagnant":"";
+      if(tag){ ctx.fillStyle="#9fb4c9"; ctx.font="11px system-ui"; ctx.fillText(tag, r.x+8, r.y+r.h-9); }
+    }
+    // resize handle
+    if(seld){ ctx.fillStyle="#5ec6ff"; ctx.fillRect(r.x+r.w-7,r.y+r.h-7,12,12); }
+  }
+  // windows
+  for(const w of state.windows){
+    const seg=windowSegment(w); if(!seg) continue;
+    let color="#9b8cff", advice="";
+    if(h){
+      const r=roomById(w.roomId); const indoorT = r? +r.temp : maxIndoor();
+      const outdoorT = (w.temp!=null? +w.temp : h.temp);
+      const sunHit = sunOnWindow(w,h.sun)&&h.rad>120;
+      if(sunHit){ color="#ffd34d"; advice="shade"; }
+      else if(ventilate(outdoorT, indoorT, comfort)){ color="#37d39a"; advice="open"; }
+      else { color="#ffb03a"; advice="closed"; }
+    }
+    ctx.strokeStyle=color; ctx.lineWidth=7; ctx.lineCap="round";
+    ctx.beginPath(); ctx.moveTo(seg.x1,seg.y1); ctx.lineTo(seg.x2,seg.y2); ctx.stroke();
+    if(sel&&sel.type==="window"&&sel.id===w.id){
+      ctx.strokeStyle="#fff"; ctx.lineWidth=2; ctx.beginPath();
+      ctx.moveTo(seg.x1,seg.y1); ctx.lineTo(seg.x2,seg.y2); ctx.stroke();
+    }
+    // facing label
+    const m=windowMid(w); ctx.fillStyle="#9fb4c9"; ctx.font="10px system-ui";
+    ctx.fillText(compassName(windowFacing(w)), m.x-6, m.y-9);
+    // outdoor temp in front of this window (if entered)
+    if(w.temp!=null){ const v=outwardVec(w.side);
+      ctx.fillStyle="#7fd0ff"; ctx.font="700 11px system-ui";
+      ctx.fillText(w.temp+"°", m.x+v.x*16-8, m.y+v.y*16+4); }
+  }
+  drawAirflow();
+  drawDoors();
+  drawGhostFans();
+  drawCompass();
+  drawSun(h);
+}
+function arrowHead(a,b){
+  const ang=Math.atan2(b.y-a.y,b.x-a.x), s=8;
+  ctx.beginPath();
+  ctx.moveTo(b.x,b.y);
+  ctx.lineTo(b.x-Math.cos(ang-0.4)*s, b.y-Math.sin(ang-0.4)*s);
+  ctx.lineTo(b.x-Math.cos(ang+0.4)*s, b.y-Math.sin(ang+0.4)*s);
+  ctx.closePath(); ctx.fill();
+}
+function drawAirflow(){
+  if(!lastAir||!lastAir.active) return;
+  ctx.save();
+  ctx.fillStyle="rgba(94,198,255,.9)"; ctx.strokeStyle="rgba(94,198,255,.5)"; ctx.lineWidth=3;
+  for(const path of lastAir.paths){
+    const pts=(path.pts||[]).filter(Boolean); if(pts.length<2) continue;
+    ctx.setLineDash([6,5]); ctx.beginPath(); ctx.moveTo(pts[0].x,pts[0].y);
+    for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x,pts[i].y);
+    ctx.stroke(); ctx.setLineDash([]);
+    for(let i=1;i<pts.length;i++) arrowHead(pts[i-1],pts[i]);
+  }
+  ctx.restore();
+}
+function drawDoors(){
+  for(const d of state.doors){
+    const seld=sel&&sel.type==="door"&&sel.id===d.id;
+    let onPath=false;
+    if(lastAir) for(const p of lastAir.paths){ for(let i=0;i<p.roomPath.length-1;i++){
+      const a=p.roomPath[i],b=p.roomPath[i+1];
+      if((a===d.roomA&&b===d.roomB)||(a===d.roomB&&b===d.roomA)){onPath=true;break;} } if(onPath)break; }
+    const vert=doorWallVertical(d), half=15;
+    let x1,y1,x2,y2;
+    if(vert){ x1=x2=d.x; y1=d.y-half; y2=d.y+half; } else { y1=y2=d.y; x1=d.x-half; x2=d.x+half; }
+    ctx.save(); ctx.lineCap="round";
+    // selection halo
+    if(seld){ ctx.strokeStyle="rgba(255,255,255,.85)"; ctx.lineWidth=1.5; ctx.setLineDash([3,3]);
+      ctx.beginPath(); ctx.arc(d.x,d.y,half+5,0,7); ctx.stroke(); ctx.setLineDash([]); }
+    if(d.open){
+      const col = onPath?"#5ec6ff":"#37d39a";
+      // jamb posts (the door frame) — short ticks perpendicular to the opening at each end
+      ctx.strokeStyle=col; ctx.lineWidth=4;
+      if(vert){ tick(x1,y1,8,0); tick(x2,y2,8,0); } else { tick(x1,y1,0,8); tick(x2,y2,0,8); }
+      // door leaf swung open + dashed swing arc (clearly "ajar")
+      ctx.lineWidth=3; ctx.beginPath();
+      if(vert){ ctx.moveTo(d.x,y1); ctx.lineTo(d.x+13,y1+13); } else { ctx.moveTo(x1,d.y); ctx.lineTo(x1+13,d.y+13); }
+      ctx.stroke();
+      ctx.globalAlpha=.55; ctx.setLineDash([2,3]); ctx.beginPath();
+      if(vert) ctx.arc(d.x,y1,18,0,Math.PI/2); else ctx.arc(x1,d.y,18,0,Math.PI/2);
+      ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha=1;
+    } else {
+      // SHUT — solid red bar filling the opening
+      ctx.strokeStyle="#ff6b5e"; ctx.lineWidth=7;
+      ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+    }
+    // label
+    ctx.fillStyle=d.open?(onPath?"#9fe0ff":"#7fe0bd"):"#ff9d8f"; ctx.font="700 9px system-ui"; ctx.textAlign="center";
+    ctx.fillText(d.open?"OPEN":"SHUT", d.x, vert? y2+13 : y1-7);
+    ctx.textAlign="start"; ctx.restore();
+  }
+  function tick(x,y,dx,dy){ ctx.beginPath(); ctx.moveTo(x-dx,y-dy); ctx.lineTo(x+dx,y+dy); ctx.stroke(); }
+}
+function doorWallVertical(d){
+  const a=roomById(d.roomA), b=roomById(d.roomB); if(!a||!b) return true;
+  return sharedWall(a,b).vertical;
+}
+function drawGhostFans(){
+  const N=state.fanCount||0;
+  lastPlan.forEach((f,idx)=>{
+    const have = idx<N;                      // do you own a fan for this spot?
+    const col = have? "#7ee0ff" : "#5a6b7d"; // bright = use now, grey = extra suggestion
+    ctx.save();
+    ctx.setLineDash([3,3]); ctx.strokeStyle=col; ctx.lineWidth=2; ctx.globalAlpha=have?1:.6;
+    ctx.beginPath(); ctx.arc(f.x,f.y,14,0,7); ctx.stroke(); ctx.setLineDash([]);
+    ctx.font="16px system-ui"; ctx.fillText("🌀", f.x-9, f.y+6);
+    const L=32, ex=f.x+f.dir.x*L, ey=f.y+f.dir.y*L;
+    ctx.strokeStyle=col; ctx.lineWidth=3; ctx.beginPath(); ctx.moveTo(f.x,f.y); ctx.lineTo(ex,ey); ctx.stroke();
+    ctx.fillStyle=col; arrowHead({x:f.x,y:f.y},{x:ex,y:ey});
+    // numbered badge (priority order)
+    ctx.fillStyle=have?"#04263a":"#0b1219"; ctx.beginPath(); ctx.arc(f.x+12,f.y-12,8,0,7); ctx.fill();
+    ctx.fillStyle=col; ctx.font="700 11px system-ui"; ctx.textAlign="center";
+    ctx.fillText(String(idx+1), f.x+12, f.y-8); ctx.textAlign="start";
+    ctx.fillStyle=have?"#cde6ff":"#8aa0b6"; ctx.font="700 10px system-ui";
+    ctx.fillText("↕ "+f.heightM.toFixed(1)+"m", f.x-18, f.y-18);
+    ctx.restore();
+  });
+}
+const COMPASS_CX=()=>cv.width-56, COMPASS_CY=()=>56;
+// screen-space unit vector for a real compass bearing, given the flat's north rotation.
+// "up" on the canvas points toward bearing = state.northDeg, and bearing increases clockwise.
+function bearingVec(deg){ const a=(deg-state.northDeg)*Math.PI/180; return {x:Math.sin(a), y:-Math.cos(a)}; }
+function drawCompass(){
+  const cx=COMPASS_CX(), cy=COMPASS_CY(), R=26;
+  ctx.save(); ctx.translate(cx,cy);
+  ctx.fillStyle="rgba(11,18,25,.85)"; ctx.strokeStyle="#2a3a4d"; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.arc(0,0,R+14,0,7); ctx.fill(); ctx.stroke();
+  const N=bearingVec(0);
+  // N–S needle, red half pointing true North
+  ctx.strokeStyle="#3a5675"; ctx.lineWidth=3; ctx.lineCap="round";
+  ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(-N.x*R,-N.y*R); ctx.stroke();      // south half
+  ctx.strokeStyle="#ff6b5e";
+  ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(N.x*R,N.y*R); ctx.stroke();         // north half
+  const p={x:-N.y,y:N.x};                                                          // perpendicular
+  ctx.fillStyle="#ff6b5e"; ctx.beginPath();
+  ctx.moveTo(N.x*R,N.y*R);
+  ctx.lineTo(N.x*(R-9)+p.x*5, N.y*(R-9)+p.y*5);
+  ctx.lineTo(N.x*(R-9)-p.x*5, N.y*(R-9)-p.y*5);
+  ctx.closePath(); ctx.fill();
+  // cardinal labels around the dial
+  ctx.font="700 10px system-ui"; ctx.textAlign="center"; ctx.textBaseline="middle";
+  [["N",0],["E",90],["S",180],["W",270]].forEach(([lab,b])=>{
+    const d=bearingVec(b); ctx.fillStyle = lab==="N"?"#ff8a7d":"#9fb4c9";
+    ctx.fillText(lab, d.x*(R+7), d.y*(R+7));
+  });
+  ctx.textBaseline="alphabetic"; ctx.textAlign="start"; ctx.restore();
+}
+function drawSun(h){
+  if(!h||!h.sun||h.sun.altitude<=0) return;
+  const cx=COMPASS_CX(), cy=COMPASS_CY(), RR=58;
+  const v=bearingVec(h.sun.azimuth);            // real bearing → screen, orientation-aware
+  const x=cx+v.x*RR, y=cy+v.y*RR;
+  // ray from compass centre toward the sun
+  ctx.save(); ctx.strokeStyle="rgba(255,211,77,.45)"; ctx.lineWidth=2; ctx.setLineDash([3,4]);
+  ctx.beginPath(); ctx.moveTo(cx+v.x*40, cy+v.y*40); ctx.lineTo(x-v.x*10, y-v.y*10); ctx.stroke(); ctx.setLineDash([]);
+  ctx.font="22px system-ui"; ctx.fillText("☀️", x-11, y+8);
+  ctx.restore();
+}
+
+/* ---- canvas interactions ---- */
+function hitWindow(p){
+  for(const w of state.windows){ const m=windowMid(w); if(m&&Math.hypot(p.x-m.x,p.y-m.y)<14) return w; }
+  return null;
+}
+function hitFan(p){
+  for(const f of state.fans){ if(Math.hypot(p.x-f.x,p.y-f.y)<16) return f; }
+  return null;
+}
+function hitDoor(p){
+  for(const d of state.doors){ if(Math.hypot(p.x-d.x,p.y-d.y)<13) return d; }
+  return null;
+}
+function hitRoom(p){
+  for(let i=state.rooms.length-1;i>=0;i--){ const r=state.rooms[i];
+    if(p.x>=r.x&&p.x<=r.x+r.w&&p.y>=r.y&&p.y<=r.y+r.h) return r; }
+  return null;
+}
+function onHandle(p,r){ return p.x>=r.x+r.w-9&&p.x<=r.x+r.w+6&&p.y>=r.y+r.h-9&&p.y<=r.y+r.h+6; }
+
+cv.addEventListener("pointerdown",ev=>{
+  cv.setPointerCapture(ev.pointerId);
+  const p=toCanvas(ev);
+  if(tool==="room"){
+    const r={id:id(),name:"Room "+(state.rooms.length+1),x:p.x,y:p.y,w:1,h:1,temp:26};
+    state.rooms.push(r); selectItem("room",r.id);
+    drag={mode:"draw",id:r.id,sx:p.x,sy:p.y}; return;
+  }
+  if(tool==="window"){
+    const r=hitRoom(p)||nearestRoom(p);
+    if(r){ const w=placeWindow(r,p); selectItem("window",w.id); save(); refresh(); }
+    return;
+  }
+  if(tool==="door"){
+    const [a,b]=twoNearestRooms(p);
+    if(!a||!b||a===b){ flash("Draw at least two rooms first, then click on the wall between two of them."); return; }
+    if(doorBetween(a.id,b.id)){ flash(`${a.name} and ${b.name} are already connected. Double-click a door to open/close it.`); return; }
+    const pos=snapDoorPos(a,b,p);
+    const d={id:id(),roomA:a.id,roomB:b.id,x:pos.x,y:pos.y,open:true};
+    state.doors.push(d); selectItem("door",d.id); save(); refresh();
+    flash(`Doorway added: ${a.name} ↔ ${b.name} (OPEN). Drag it onto the real opening; double-click to shut.`);
+    return;
+  }
+  // select tool
+  const dr=hitDoor(p); if(dr){ selectItem("door",dr.id); drag={mode:"door",id:dr.id,dx:p.x-dr.x,dy:p.y-dr.y}; return; }
+  const win=hitWindow(p); if(win){ selectItem("window",win.id);
+    drag={mode:"win",id:win.id}; return; }
+  const room=hitRoom(p);
+  if(room){
+    selectItem("room",room.id);
+    if(onHandle(p,room)) drag={mode:"resize",id:room.id};
+    else drag={mode:"move",id:room.id,dx:p.x-room.x,dy:p.y-room.y};
+    return;
+  }
+  selectItem(null);
+});
+cv.addEventListener("pointermove",ev=>{
+  if(!drag) return;
+  const p=toCanvas(ev);
+  if(drag.mode==="draw"){ const r=roomById(drag.id);
+    r.x=Math.min(drag.sx,p.x); r.y=Math.min(drag.sy,p.y); r.w=Math.abs(p.x-drag.sx); r.h=Math.abs(p.y-drag.sy); render(); }
+  else if(drag.mode==="move"){ const r=roomById(drag.id); r.x=p.x-drag.dx; r.y=p.y-drag.dy; resnapDoorsForRoom(r.id); render(); }
+  else if(drag.mode==="resize"){ const r=roomById(drag.id); r.w=Math.max(40,p.x-r.x); r.h=Math.max(40,p.y-r.y); resnapDoorsForRoom(r.id); render(); }
+  else if(drag.mode==="fan"){ const f=state.fans.find(x=>x.id===drag.id); f.x=p.x-drag.dx; f.y=p.y-drag.dy; render(); }
+  else if(drag.mode==="door"){ const d=doorById(drag.id); const pos=snapDoorPos(roomById(d.roomA),roomById(d.roomB),p); d.x=pos.x; d.y=pos.y; render(); }
+  else if(drag.mode==="win"){ // slide window along its wall, or snap to nearest wall of nearest room
+    const w=state.windows.find(x=>x.id===drag.id); const r=roomById(w.roomId);
+    snapWindow(w,r,p); render(); }
+});
+cv.addEventListener("pointerup",ev=>{
+  if(drag){
+    if(drag.mode==="draw"){ const r=roomById(drag.id); if(r.w<30||r.h<30){r.w=Math.max(r.w,120);r.h=Math.max(r.h,90);} }
+    drag=null; save(); refresh();
+  }
+});
+function nearestRoom(p){
+  let best=null,bd=1e9;
+  for(const r of state.rooms){ const cx=Math.max(r.x,Math.min(p.x,r.x+r.w)), cy=Math.max(r.y,Math.min(p.y,r.y+r.h));
+    const d=Math.hypot(p.x-cx,p.y-cy); if(d<bd){bd=d;best=r;} }
+  return best;
+}
+function placeWindow(r,p){
+  const w={id:id(),roomId:r.id,side:"N",pos:.5,len:80,shade:true,temp:null};
+  snapWindow(w,r,p); state.windows.push(w); return w;
+}
+function snapWindow(w,r,p){
+  // choose nearest wall, set side+pos
+  const dT=Math.abs(p.y-r.y), dB=Math.abs(p.y-(r.y+r.h)), dL=Math.abs(p.x-r.x), dR=Math.abs(p.x-(r.x+r.w));
+  const m=Math.min(dT,dB,dL,dR);
+  if(m===dT){w.side="N"; w.pos=clamp01((p.x-r.x)/r.w);}
+  else if(m===dB){w.side="S"; w.pos=clamp01((p.x-r.x)/r.w);}
+  else if(m===dL){w.side="W"; w.pos=clamp01((p.y-r.y)/r.h);}
+  else {w.side="E"; w.pos=clamp01((p.y-r.y)/r.h);}
+}
+function clamp01(v){ return Math.max(.08,Math.min(.92,v)); }
+
+/* ------------------------------------------------------------------ */
+/* Selection panel                                                     */
+/* ------------------------------------------------------------------ */
+function selectItem(type,idv){ sel = type? {type,id:idv} : null; renderSelPanel(); render(); }
+function renderSelPanel(){
+  const card=document.getElementById("selCard"), body=document.getElementById("selBody");
+  if(!sel){ card.style.display="none"; return; }
+  card.style.display="block";
+  if(sel.type==="room"){
+    const r=roomById(sel.id); if(!r){selectItem(null);return;}
+    body.innerHTML=`
+      <label>Room name</label><input type="text" id="f_name" value="${esc(r.name)}"/>
+      <label>Measured temperature (°C)</label><input type="number" id="f_temp" step="0.5" value="${r.temp}"/>
+      <div class="hint">Tip: name your corridor “Hallway” so airflow advice routes through it.</div>`;
+    document.getElementById("f_name").oninput=e=>{r.name=e.target.value;save();render();};
+    document.getElementById("f_temp").oninput=e=>{r.temp=parseFloat(e.target.value);save();refresh();};
+  } else if(sel.type==="window"){
+    const w=state.windows.find(x=>x.id===sel.id); if(!w){selectItem(null);return;}
+    const r=roomById(w.roomId);
+    body.innerHTML=`
+      <div class="hint">In <b>${esc(r?r.name:"?")}</b> · faces <b>${compassName(windowFacing(w))}</b> (${Math.round(windowFacing(w))}°)</div>
+      <label>🌡 Outdoor temp <b>in front of this window</b> (°C)</label>
+      <input type="number" id="f_wtemp" step="0.5" value="${w.temp==null?"":w.temp}" placeholder="blank = use area forecast"/>
+      <div class="hint">A shaded courtyard window can be several degrees cooler than the rooftop forecast. Set it and the open/close + intake choice use this number.</div>
+      <label>Wall</label>
+      <select id="f_side">
+        ${["N","E","S","W"].map(s=>`<option value="${s}" ${w.side===s?"selected":""}>${s} side (map ${ {N:"top",E:"right",S:"bottom",W:"left"}[s] })</option>`).join("")}
+      </select>
+      <label>Width on wall: <span id="lenv">${w.len}px</span></label>
+      <input type="range" id="f_len" min="30" max="200" value="${w.len}"/>
+      <div class="row">
+        <div><label>Sill height (m)</label><input type="number" id="f_sill" step="0.1" min="0" value="${winSill(w)}"/></div>
+        <div><label>Window height (m)</label><input type="number" id="f_winh" step="0.1" min="0.1" value="${winHeight(w)}"/></div>
+      </div>
+      <div class="hint">Top of glass: <b id="wtop">${winTop(w).toFixed(1)} m</b>. These drive the stack-effect fan heights.</div>
+      <label><input type="checkbox" id="f_shade" ${w.shade?"checked":""}/> Has a shade / blind / curtain</label>`;
+    document.getElementById("f_wtemp").oninput=e=>{w.temp=e.target.value===""?null:parseFloat(e.target.value);save();refresh();};
+    document.getElementById("f_side").onchange=e=>{w.side=e.target.value;save();refresh();};
+    document.getElementById("f_len").oninput=e=>{w.len=+e.target.value;document.getElementById("lenv").textContent=w.len+"px";save();render();};
+    document.getElementById("f_sill").oninput=e=>{w.sill=e.target.value===""?null:parseFloat(e.target.value);document.getElementById("wtop").textContent=winTop(w).toFixed(1)+" m";save();refresh();};
+    document.getElementById("f_winh").oninput=e=>{w.winH=e.target.value===""?null:parseFloat(e.target.value);document.getElementById("wtop").textContent=winTop(w).toFixed(1)+" m";save();refresh();};
+    document.getElementById("f_shade").onchange=e=>{w.shade=e.target.checked;save();refresh();};
+  } else if(sel.type==="fan"){
+    body.innerHTML=`<div class="hint">Your fan, placed manually. Drag it on the map. The <b>Airflow &amp; fan plan</b> panel computes the ideal spots (shown as dashed ghosts).</div>`;
+  } else if(sel.type==="door"){
+    const d=doorById(sel.id); if(!d){selectItem(null);return;}
+    const ra=roomById(d.roomA), rb=roomById(d.roomB);
+    body.innerHTML=`
+      <div class="hint">Connects <b>${esc(ra?ra.name:"?")}</b> ↔ <b>${esc(rb?rb.name:"?")}</b></div>
+      <label><input type="checkbox" id="f_dopen" ${d.open?"checked":""}/> Door open (air can pass)</label>
+      <div class="hint">Drag it along the shared wall to line up with the real opening (it stays snapped to the wall). Open doors let the cross-breeze flow between rooms.</div>`;
+    document.getElementById("f_dopen").onchange=e=>{d.open=e.target.checked;save();refresh();};
+  }
+}
+function esc(s){ return (s||"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+let flashTimer=null;
+function flash(msg){ const el=document.getElementById("canvasMsg"); el.textContent=msg;
+  clearTimeout(flashTimer); flashTimer=setTimeout(()=>{el.textContent="";},3500); }
+// single-level-friendly undo stack so deletes are safe
+let undoStack=[];
+function pushUndo(){ undoStack.push(JSON.stringify(state)); if(undoStack.length>40) undoStack.shift(); }
+function undo(){ const s=undoStack.pop(); if(!s){ flash("Nothing to undo."); return; }
+  state=JSON.parse(s); sel=null; save(); refresh(); flash("Undone."); }
+function deleteItem(type,idv){
+  pushUndo();
+  if(type==="room"){ state.rooms=state.rooms.filter(r=>r.id!==idv);
+    state.windows=state.windows.filter(w=>w.roomId!==idv);
+    state.doors=state.doors.filter(d=>d.roomA!==idv&&d.roomB!==idv); }
+  if(type==="window"){ state.windows=state.windows.filter(w=>w.id!==idv); }
+  if(type==="door"){ state.doors=state.doors.filter(d=>d.id!==idv); }
+  if(type==="fan"){ state.fans=state.fans.filter(f=>f.id!==idv); }
+  if(sel&&sel.id===idv) selectItem(null);
+  save(); refresh(); flash("Deleted — press Ctrl+Z to undo.");
+}
+document.getElementById("delSel").onclick=()=>{ if(sel) deleteItem(sel.type,sel.id); };
+window.addEventListener("keydown",e=>{
+  const typing=document.activeElement&&(document.activeElement.tagName==="INPUT"||document.activeElement.tagName==="SELECT");
+  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="z"&&!typing){ e.preventDefault(); undo(); return; }
+  if((e.key==="Delete"||e.key==="Backspace")&&sel&&!typing){
+    e.preventDefault(); document.getElementById("delSel").click();
+  }
+});
+// double-click a door to toggle open/shut
+cv.addEventListener("dblclick",ev=>{
+  const p=toCanvas(ev); const d=hitDoor(p);
+  if(d){ d.open=!d.open; save(); refresh(); flash(`${roomById(d.roomA).name} ↔ ${roomById(d.roomB).name} door is now ${d.open?"OPEN":"SHUT"}.`); }
+});
+// right-click anything on the canvas to delete it quickly
+cv.addEventListener("contextmenu",ev=>{
+  ev.preventDefault();
+  const p=toCanvas(ev);
+  const d=hitDoor(p); if(d){ deleteItem("door",d.id); return; }
+  const w=hitWindow(p); if(w){ deleteItem("window",w.id); return; }
+  const f=hitFan(p); if(f){ deleteItem("fan",f.id); return; }
+  const r=hitRoom(p); if(r){ selectItem("room",r.id); flash("Right-clicked a room — press Del again to remove it (and its windows)."); }
+});
+
+/* ------------------------------------------------------------------ */
+/* Advice rendering                                                    */
+/* ------------------------------------------------------------------ */
+function refresh(){
+  lastAir = weather ? analyzeAirflow() : null;
+  lastPlan = weather ? buildFanPlan(lastAir||{active:false,openWins:[]}) : [];
+  render(); renderSelPanel(); renderAdvice(); renderFanPlan(); renderTimeline();
+}
+function renderFanPlan(){
+  const el=document.getElementById("fanplan");
+  if(!weather){ el.innerHTML='<div class="muted">Set a location to model airflow and fan placement.</div>'; return; }
+  if(state.rooms.length===0){ el.innerHTML='<div class="muted">Draw rooms and connect them with the Door tool.</div>'; return; }
+  const air=lastAir; let html="";
+  if(air&&air.active){
+    const names=set=>[...set].map(r=>{const x=roomById(r);return x?esc(x.name):"";}).filter(Boolean);
+    const flow=names(air.flowRooms), stag=names(air.stagnant), single=names(air.singleRooms);
+    html+=`<div style="margin-bottom:8px">`;
+    html+= air.paths.length
+      ? `<div>🌬️ Cross-breeze flowing through: <b>${flow.join(", ")||"—"}</b>. Arrows on the map show the path.</div>`
+      : `<div>🌬️ Windows are open but there's no through-path — you need open windows on two <i>different</i> sides linked by open doors.</div>`;
+    if(single.length) html+=`<div class="muted">~ One-sided airflow (limited): ${single.join(", ")}.</div>`;
+    if(stag.length) html+=`<div class="muted">⚠ Stagnant (no fresh air): ${stag.join(", ")}.</div>`;
+    air.doorSuggest.forEach(s=>html+=`<div style="color:var(--accent);margin-top:3px">🚪 ${s}</div>`);
+    html+=`</div>`;
+    // Stack-effect + Bernoulli physics narrative
+    const st=air._stack;
+    if(st&&st.dH!=null&&st.exWin&&st.inWin){
+      const dT=Math.max(0,(maxIndoor()||0)-(nowHour().temp));
+      const drive=st.dH*dT;
+      const strength = drive>9?"strong":drive>3.5?"moderate":"gentle";
+      html+=`<div class="rec" style="border-color:#2f4a63">
+        <div class="ttl"><span>🌡️ Stack effect</span><span class="muted">${strength}</span></div>
+        <div>Intake low at <b>${st.inSill.toFixed(1)} m</b>, exhaust high at <b>${st.exTop.toFixed(1)} m</b> → height gap <b>Δh ${st.dH.toFixed(1)} m</b>, with <b>ΔT ${dT.toFixed(1)}°</b> inside-vs-out.</div>
+        <div class="muted" style="margin-top:3px">Warm air rises and escapes high while cool air is pulled in low. The bigger Δh and ΔT, the stronger this free chimney draft — so raise the exhaust and lower the intake as far as the windows allow.</div>`;
+      // Bernoulli / continuity — inlet vs outlet sizing
+      const aIn=winArea(st.inWin), aOut=winArea(st.exWin);
+      const tip = aIn>=aOut
+        ? `For a <b>faster, cooler-feeling breeze</b>, open the exhaust fully and the intake ~⅓. By continuity (Bernoulli), a narrower inlet speeds up the incoming jet and throws it deeper into the room. Open both wide instead to flush heat fastest.`
+        : `Your intake is already smaller than the exhaust → the incoming air accelerates into a fast jet (Bernoulli). Widen the intake if you'd rather maximise total air exchange than breeze speed.`;
+      html+=`<div style="margin-top:5px">💨 ${tip}</div>
+        <div class="muted" style="margin-top:5px">📍 <b>Where to stand a fan:</b> it blows a focused jet but draws air diffusely. Keep <b>window</b> fans in the opening (an intake's back must face outside; seal an exhaust). Stand <b>doorway</b> fans ~½ m back on the upstream side and aim through the gap — the jet entrains extra air and amplifies the flow.</div></div>`;
+    }
+  } else {
+    html+=`<div class="muted" style="margin-bottom:8px">Outside isn't cooler than your rooms — keep windows shut. The fans below are for comfort (moving air feels cooler), not for drawing in outside air.</div>`;
+  }
+  const N=state.fanCount||0;
+  if(lastPlan.length===0){ html+=`<div class="muted">No fan needed right now.</div>`; }
+  else if(N===0){ html+=`<div class="muted">Set how many portable fans you have (left panel) and I'll place them.</div>`; }
+  else {
+    const card=(f,i,use)=>`<div class="rec" style="${use?'':'opacity:.6'}">
+        <div class="ttl"><span>${use?`▶ Fan ${i+1}`:`+ Extra`} · ${f.label}</span></div>
+        <div>📐 <b>Height:</b> ${f.heightName}</div>
+        <div class="muted" style="margin-top:3px">${f.why}</div></div>`;
+    const use=lastPlan.slice(0,N), extra=lastPlan.slice(N);
+    html+=`<div class="hint" style="margin-bottom:4px">Place your <b>${N}</b> portable fan${N>1?"s":""} here (numbered ghosts on the map, best first):</div>`;
+    use.forEach((f,i)=>html+=card(f,i,true));
+    if(extra.length){
+      html+=`<div class="hint" style="margin:6px 0 4px">If you get more fans, next best spots:</div>`;
+      extra.forEach((f,i)=>html+=card(f,i,false));
+    } else if(lastPlan.length<N){
+      html+=`<div class="hint">That's all the fans this layout needs right now — ${lastPlan.length} spot${lastPlan.length>1?"s":""}. Spare fans won't add much.</div>`;
+    }
+  }
+  el.innerHTML=html;
+}
+
+function renderAdvice(){
+  const h=nowHour(), comfort=+state.comfort;
+  const nowStatus=document.getElementById("nowStatus");
+  const kpi=document.getElementById("nowKpi");
+  const windLine=document.getElementById("windLine");
+  const actions=document.getElementById("actions");
+  const warnArea=document.getElementById("warnArea");
+  warnArea.innerHTML="";
+
+  if(!state.location){ nowStatus.textContent="Set a location to begin"; kpi.innerHTML=""; windLine.textContent=""; actions.innerHTML='<div class="muted">Add a location (top-left) to fetch outdoor temperature.</div>'; return; }
+  if(!weather){ nowStatus.textContent="Loading weather…"; return; }
+  if(state.rooms.length===0){ actions.innerHTML='<div class="muted">Draw at least one room and type its temperature.</div>'; }
+
+  const indoorMax=maxIndoor();
+  const outdoor=h?h.temp:weather.current.temp;
+  const cool = outdoor<=indoorMax-1;
+  const globalVent = ventilate(outdoor, indoorMax, comfort);
+
+  nowStatus.innerHTML = globalVent
+    ? `🟢 Open up — it's cooler outside`
+    : (outdoor>indoorMax ? `🟠 Seal the flat — it's hotter outside` : `🟠 Hold — little to gain by opening`);
+
+  kpi.innerHTML=`
+    <div><div class="v">${fmt(outdoor)}°</div><div class="l">Outdoor</div></div>
+    <div><div class="v">${indoorMax==null?"—":fmt(indoorMax)}°</div><div class="l">Warmest room</div></div>
+    <div><div class="v">${comfort}°</div><div class="l">Target</div></div>`;
+  const wd=weather.current.windDir, ws=weather.current.windSpd;
+  windLine.innerHTML=`💨 Wind ${Math.round(ws)} km/h from ${compassName(wd)} · ☀️ ${h&&h.sun&&h.sun.altitude>0?("sun in the "+compassName(h.sun.azimuth)+", "+Math.round(h.sun.altitude)+"° up"):"sun is down"} · ${weather.tz}`;
+
+  // Per-room action list
+  let html="";
+  // global strategy line
+  if(globalVent){
+    const opp=hasCrossVentilation();
+    html+=`<div class="rec"><div class="ttl">Whole flat <span class="pill open">VENTILATE</span></div>
+      <ul>
+        <li>Open windows wide and ${opp?"open the doors between rooms (incl. the hallway) for a <b>cross-breeze</b>":"open internal doors to let air move through"}.</li>
+        <li>Goal: flush the day's heat while outside (${fmt(outdoor)}°) is below your rooms.</li>
+        <li>👉 See <b>Airflow &amp; fan plan</b> below for exactly where to put fans and at what height.</li>
+      </ul></div>`;
+  } else {
+    html+=`<div class="rec"><div class="ttl">Whole flat <span class="pill closed">KEEP CLOSED</span></div>
+      <ul>
+        <li>Close windows on the warm/sunny sides to trap the cool you banked overnight.</li>
+        <li>Use fans to <b>move indoor air</b> (a breeze feels ~3°C cooler) — don't draw in the hot outside air. See the fan plan below.</li>
+        <li>Reopen when outside drops below your room temp (see the timeline).</li>
+      </ul></div>`;
+  }
+
+  for(const r of state.rooms){
+    const wins=state.windows.filter(w=>w.roomId===r.id);
+    const indoorT=+r.temp;
+    let items=[];
+    for(const w of wins){
+      const outT = w.temp!=null? +w.temp : outdoor;
+      const sunHit = h && sunOnWindow(w,h.sun) && h.rad>120;
+      const facing=compassName(windowFacing(w));
+      if(sunHit){
+        items.push(`<span class="pill shade">SHADE</span> ${facing} window — sun is on the glass.${w.shade?" Close the blind/curtain.":" ⚠️ No shade fitted; improvise (cardboard, towel, foil) outside the glass if you can."}`);
+      } else if(ventilate(outT, indoorT, comfort)){
+        const role=windRole(windowFacing(w), wd, ws);
+        items.push(`<span class="pill open">OPEN</span> ${facing} window${role==="windward"?" (breeze blows in here — main intake)":role==="leeward"?" (good spot for a fan blowing out)":""}.`);
+      } else {
+        items.push(`<span class="pill closed">CLOSE</span> ${facing} window — outside not cooler.`);
+      }
+    }
+    if(wins.length===0) items.push(`<span class="tag">No windows drawn. Use the Window tool to add one.</span>`);
+    const warm = indoorT>=comfort;
+    html+=`<div class="rec"><div class="ttl"><span>${esc(r.name)}</span><span class="muted">${isFinite(indoorT)?fmt(indoorT)+"°":"—"} ${warm?"🔥":"✅"}</span></div>
+      <ul>${items.map(i=>`<li>${i}</li>`).join("")}</ul></div>`;
+  }
+  actions.innerHTML=html;
+
+  // warnings
+  const noTemp=state.rooms.some(r=>!isFinite(+r.temp));
+  if(noTemp) warnArea.innerHTML=`<div class="warnbox">Some rooms have no temperature yet — click a room and type what your thermometer reads for accurate advice.</div>`;
+}
+function hasCrossVentilation(){
+  const facings=state.windows.map(windowFacing);
+  for(let i=0;i<facings.length;i++) for(let j=i+1;j<facings.length;j++)
+    if(angDiff(facings[i],facings[j])>120) return true;
+  return false;
+}
+function leewardSideName(){
+  if(!weather) return null;
+  const wd=weather.current.windDir;
+  // window most opposite the wind = leeward
+  let best=null,bd=-1;
+  for(const w of state.windows){ const d=angDiff(windowFacing(w),wd); if(d>bd){bd=d;best=w;} }
+  return best?compassName(windowFacing(best)):null;
+}
+function fmt(v){ return v==null||!isFinite(v)?"—":(Math.round(v*10)/10); }
+
+function renderTimeline(){
+  const tl=document.getElementById("timeline"), labels=document.getElementById("tlabels"),
+        summ=document.getElementById("timelineSummary");
+  tl.innerHTML=""; labels.innerHTML=""; summ.innerHTML="";
+  if(!weather||state.rooms.length===0){ summ.innerHTML='<span class="muted">Add rooms + location for an hourly plan.</span>'; return; }
+  const indoorT=maxIndoor(), comfort=+state.comfort;
+  const start=weather.nowIdx, N=Math.min(24, weather.hours.length-start);
+  const slice=weather.hours.slice(start,start+N);
+  const temps=slice.map(h=>h.temp); const tmin=Math.min(...temps), tmax=Math.max(...temps);
+  let firstVent=null, sealAt=null, prevVent=null;
+  slice.forEach((h,i)=>{
+    const c=classifyHour(h,indoorT,comfort);
+    if(c.vent&&firstVent==null) firstVent=h;
+    if(prevVent===true&&c.vent===false&&sealAt==null) sealAt=h;
+    prevVent=c.vent;
+    const col=document.createElement("div"); col.className="tcol";
+    const frac=tmax>tmin?(h.temp-tmin)/(tmax-tmin):.5;
+    const bh=18+frac*46;
+    let bg = c.vent? "var(--cool)" : "var(--warn)";
+    const bar=document.createElement("div"); bar.className="bar";
+    bar.style.height=bh+"px"; bar.style.background=bg;
+    if(c.anySun){ bar.style.boxShadow="inset 0 3px 0 var(--sun)"; }
+    col.title=`${h.hour}:00 — ${fmt(h.temp)}° outside · ${c.vent?"ventilate":"seal"}${c.anySun?" · sun on glass":""}`;
+    col.appendChild(bar); tl.appendChild(col);
+    if(i%3===0){ const s=document.createElement("span"); s.textContent=h.hour; labels.appendChild(s); }
+    else labels.appendChild(document.createElement("span"));
+  });
+  // summary callouts
+  const nowVent=classifyHour(slice[0],indoorT,comfort).vent;
+  let parts=[];
+  if(nowVent){
+    // find when current vent window ends
+    let end=null; for(let i=0;i<slice.length;i++){ if(!classifyHour(slice[i],indoorT,comfort).vent){end=slice[i];break;} }
+    parts.push(`✅ <b>Ventilate now.</b>${end?` Window of opportunity until about <b>${end.hour}:00</b> (then it stops helping).`:""}`);
+  } else if(firstVent){
+    parts.push(`⏳ Next good time to open up: <b>${firstVent.hour}:00</b> (drops to ${fmt(firstVent.temp)}° outside).`);
+  } else {
+    parts.push(`🟠 Outside stays warmer than your rooms for the next ${N}h — keep it sealed and shaded; rely on fans.`);
+  }
+  // coolest hour
+  let coolH=slice[0]; for(const h of slice) if(h.temp<coolH.temp) coolH=h;
+  parts.push(`🌙 Coolest hour ahead: <b>${coolH.hour}:00</b> at ${fmt(coolH.temp)}° — best moment to flush heat.`);
+  // sun warning for west-ish windows
+  const sunWins=new Set();
+  slice.forEach(h=>{ if(h.rad>120) state.windows.forEach(w=>{ if(sunOnWindow(w,h.sun)) sunWins.add(compassName(windowFacing(w))); }); });
+  if(sunWins.size) parts.push(`☀️ Sun will hit your <b>${[...sunWins].join(", ")}</b> window(s) — shade them before it arrives.`);
+  summ.innerHTML=parts.map(p=>`<div style="margin:4px 0">${p}</div>`).join("");
+}
+
+/* ------------------------------------------------------------------ */
+/* UI wiring                                                            */
+/* ------------------------------------------------------------------ */
+document.querySelectorAll(".tool").forEach(b=>b.onclick=()=>{
+  document.querySelectorAll(".tool").forEach(x=>x.classList.remove("active"));
+  b.classList.add("active"); tool=b.dataset.tool;
+  const hints={select:"Click a room/window/door to edit. Drag to move; drag the corner to resize.",
+    room:"Click and drag on the canvas to draw a room.",
+    window:"Click on (or near) a wall to drop a window. Drag it to slide along the wall.",
+    door:"Click on the wall between two rooms — a doorway connects them so air can flow. Double-click a door to open/shut it.",
+    fan:"Click inside the flat to drop a fan you own, then drag to position."};
+  document.getElementById("toolHint").textContent=hints[tool];
+  document.getElementById("canvasMsg").textContent =
+    tool==="door" ? "🚪 Door mode: click the wall/gap between two rooms to connect them. Doors show OPEN (green, ajar) or SHUT (red bar). Double-click to toggle."
+    : tool==="window" ? "▥ Window mode: click a wall to add a window. Select it to set its size and the outdoor temp you measure in front of it."
+    : "";
+});
+document.getElementById("comfort").value=state.comfort;
+document.getElementById("comfort").oninput=e=>{state.comfort=parseFloat(e.target.value)||24;save();refresh();};
+const ceilEl=document.getElementById("ceiling");
+ceilEl.value=state.ceilingH;
+ceilEl.oninput=e=>{state.ceilingH=parseFloat(e.target.value)||2.5;save();refresh();};
+const fanCountEl=document.getElementById("fancount");
+fanCountEl.value=state.fanCount;
+fanCountEl.oninput=e=>{state.fanCount=Math.max(0,Math.min(8,parseInt(e.target.value)||0));save();refresh();};
+const northEl=document.getElementById("north");
+northEl.value=state.northDeg;
+document.getElementById("northVal").textContent=state.northDeg+"°";
+northEl.oninput=e=>{state.northDeg=+e.target.value;document.getElementById("northVal").textContent=state.northDeg+"°";save();refresh();};
+
+document.getElementById("locSearch").onclick=doSearch;
+document.getElementById("locInput").addEventListener("keydown",e=>{if(e.key==="Enter")doSearch();});
+async function doSearch(){
+  const q=document.getElementById("locInput").value.trim(); if(!q) return;
+  const box=document.getElementById("locResults"); box.style.display="block"; box.innerHTML='<div class="muted" style="padding:8px">Searching…</div>';
+  try{
+    const res=await geocode(q);
+    if(!res.length){ box.innerHTML='<div class="muted" style="padding:8px">No matches.</div>'; return; }
+    box.innerHTML="";
+    res.forEach(r=>{ const d=document.createElement("div"); d.textContent=r.name;
+      d.onclick=()=>setLocation(r); box.appendChild(d); });
+  }catch(err){ box.innerHTML='<div class="muted" style="padding:8px">Lookup failed (offline?).</div>'; }
+}
+document.getElementById("locGeo").onclick=()=>{
+  if(!navigator.geolocation){ alert("Geolocation not available."); return; }
+  navigator.geolocation.getCurrentPosition(p=>{
+    setLocation({name:"My location ("+p.coords.latitude.toFixed(2)+", "+p.coords.longitude.toFixed(2)+")",lat:p.coords.latitude,lon:p.coords.longitude});
+  },()=>alert("Couldn't get your location."));
+};
+async function setLocation(loc){
+  state.location=loc; save();
+  document.getElementById("locResults").style.display="none";
+  document.getElementById("locShow").textContent="📍 "+loc.name;
+  document.getElementById("nowStatus").textContent="Loading weather…";
+  try{ await fetchWeather(); }catch(e){ document.getElementById("nowStatus").textContent="Weather fetch failed (offline?)"; }
+  refresh();
+}
+document.getElementById("btnReset").onclick=()=>{
+  if(confirm("Reset everything (layout, location, temperatures)?")){ localStorage.removeItem(SKEY); state=seed(); location.reload(); }
+};
+const dlg=document.getElementById("helpDlg");
+document.getElementById("btnHelp").onclick=()=>dlg.showModal();
+document.getElementById("helpClose").onclick=()=>dlg.close();
+
+/* ------------------------------------------------------------------ */
+/* Boot                                                                */
+/* ------------------------------------------------------------------ */
+(async function init(){
+  state.rooms.forEach(r=>resnapDoorsForRoom(r.id));   // glue any old doors onto their walls
+  if(state.location){ document.getElementById("locShow").textContent="📍 "+state.location.name;
+    try{ await fetchWeather(); }catch(e){} }
+  refresh();
+  // refresh weather every 15 min
+  setInterval(()=>{ if(state.location) fetchWeather().then(refresh).catch(()=>{}); }, 15*60*1000);
+})();
+</script>
+</body>
+</html>
