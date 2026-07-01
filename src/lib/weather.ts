@@ -19,8 +19,8 @@ export async function fetchWeather(loc: LatLon): Promise<Weather> {
   const { lat, lon } = loc;
   const url =
     `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
-    `&hourly=temperature_2m,relative_humidity_2m,shortwave_radiation,wind_speed_10m,wind_direction_10m` +
-    `&current=temperature_2m,relative_humidity_2m,wind_speed_10m,wind_direction_10m,is_day` +
+    `&hourly=temperature_2m,relative_humidity_2m,shortwave_radiation,wind_speed_10m,wind_direction_10m,precipitation,precipitation_probability` +
+    `&current=temperature_2m,relative_humidity_2m,wind_speed_10m,wind_direction_10m,precipitation,is_day` +
     `&timezone=auto&forecast_days=2`;
   const r = await fetch(url);
   const j = await r.json();
@@ -39,6 +39,8 @@ export async function fetchWeather(loc: LatLon): Promise<Weather> {
       rad: H.shortwave_radiation[i],
       windSpd: H.wind_speed_10m[i],
       windDir: H.wind_direction_10m[i],
+      precip: H.precipitation?.[i] ?? 0,
+      precipProb: H.precipitation_probability?.[i] ?? 0,
       sun: sunPosition(realDate, lat, lon),
     });
   }
@@ -55,6 +57,7 @@ export async function fetchWeather(loc: LatLon): Promise<Weather> {
       rh: j.current.relative_humidity_2m,
       windSpd: j.current.wind_speed_10m,
       windDir: j.current.wind_direction_10m,
+      precip: j.current.precipitation ?? 0,
       isDay: j.current.is_day,
       sun: hours[nowIdx] ? hours[nowIdx].sun : null,
     },

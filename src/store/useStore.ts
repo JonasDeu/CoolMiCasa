@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
-import type { Doc, LatLon, Pt, Selection, Tool, Weather } from "../types";
+import type { Doc, LatLon, Pt, Selection, ThermalMass, Tool, Weather } from "../types";
 import { uid } from "../lib/id";
 import { nearestRoom, roomById, snapDoorPos, snapWindow, twoNearestRooms } from "../lib/geometry";
 import { TEMPLATES, templateById } from "../lib/templates";
@@ -78,6 +78,8 @@ export interface AppState {
   setFanCount: (v: number) => void;
   setNorth: (v: number) => void;
   setCanSealFan: (v: boolean) => void;
+  setMass: (v: ThermalMass) => void;
+  setQuickIndoorTemp: (v: number | null) => void;
   setLocation: (loc: LatLon | null) => void;
   setWeather: (w: Weather | null, status: AppState["weatherStatus"]) => void;
 
@@ -148,6 +150,16 @@ export const useStore = create<AppState>()(
     setCanSealFan: (v) =>
       set((s) => {
         s.doc.canSealFan = v;
+        persist(s.doc);
+      }),
+    setMass: (v) =>
+      set((s) => {
+        s.doc.mass = v;
+        persist(s.doc);
+      }),
+    setQuickIndoorTemp: (v) =>
+      set((s) => {
+        s.doc.quickIndoorTemp = v;
         persist(s.doc);
       }),
     setLocation: (loc) =>

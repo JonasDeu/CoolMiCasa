@@ -139,6 +139,10 @@ export function FanPlanPanel() {
         <p className="hint">
           Place your <b>{owned}</b> portable fan{owned > 1 ? "s" : ""} here (numbered ghosts on the map, best first):
         </p>
+        <p className="hint">
+          These are starting points from the airflow model, not exact spots — nudge each fan to where the draught actually
+          feels strongest.
+        </p>
         {use.map((f, i) => (
           <FanCard key={i} idx={i} label={f.label} heightName={f.heightName} why={f.why} use />
         ))}

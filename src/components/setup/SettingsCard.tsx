@@ -1,4 +1,5 @@
 import { useStore } from "../../store/useStore";
+import type { ThermalMass } from "../../types";
 import { Card, Hint } from "../ui";
 
 export function SettingsCard() {
@@ -6,10 +7,12 @@ export function SettingsCard() {
   const ceilingH = useStore((s) => s.doc.ceilingH);
   const fanCount = useStore((s) => s.doc.fanCount);
   const canSealFan = useStore((s) => s.doc.canSealFan);
+  const mass = useStore((s) => s.doc.mass);
   const setComfort = useStore((s) => s.setComfort);
   const setCeiling = useStore((s) => s.setCeiling);
   const setFanCount = useStore((s) => s.setFanCount);
   const setCanSealFan = useStore((s) => s.setCanSealFan);
+  const setMass = useStore((s) => s.setMass);
 
   return (
     <Card title="Comfort & home">
@@ -31,6 +34,17 @@ export function SettingsCard() {
         onChange={(e) => setCeiling(parseFloat(e.target.value) || 2.5)}
       />
       <Hint>Drives the stack effect: a taller gap between a low intake and a high exhaust gives a stronger draft.</Hint>
+
+      <label>Building / walls (thermal mass)</label>
+      <select value={mass} onChange={(e) => setMass(e.target.value as ThermalMass)}>
+        <option value="light">Lightweight — timber, drywall, prefab</option>
+        <option value="medium">Average — mixed construction</option>
+        <option value="heavy">Heavy masonry — brick, concrete, stone</option>
+      </select>
+      <Hint>
+        Heavy walls hold cool longer but need a longer cool spell to flush. This tunes how long the timeline says an open
+        window is worth it.
+      </Hint>
 
       <label>Portable fans you own</label>
       <input

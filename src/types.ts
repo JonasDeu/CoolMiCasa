@@ -19,6 +19,8 @@ export interface Room {
   temp: number;
   /** True = `temp` is a real thermometer reading. False/undefined = no sensor, estimate it. */
   measured?: boolean;
+  /** Measured indoor relative humidity from a hygrometer, %. Null/undefined = no hygrometer. */
+  rh?: number | null;
   /** Per-room comfort target, °C. Null/undefined falls back to the document default. */
   target?: number | null;
 }
@@ -51,6 +53,9 @@ export interface Door {
   open: boolean;
 }
 
+/** How heavy the building fabric is — sets how long a cool spell must last to matter. */
+export type ThermalMass = "light" | "medium" | "heavy";
+
 /** The full persisted floor-plan + settings document. */
 export interface Doc {
   location: LatLon | null;
@@ -63,6 +68,10 @@ export interface Doc {
   fanCount: number;
   /** Can the user seal a fan into a window opening? Most cheap fans can't. */
   canSealFan: boolean;
+  /** Building thermal mass — light (drywall/timber) reacts fast, heavy (masonry) is sluggish. */
+  mass: ThermalMass;
+  /** Quick-start indoor temperature, °C, used for the headline/timeline when no rooms are drawn yet. */
+  quickIndoorTemp?: number | null;
   rooms: Room[];
   windows: WindowItem[];
   doors: Door[];
@@ -84,6 +93,10 @@ export interface Hour {
   rad: number;
   windSpd: number;
   windDir: number;
+  /** Precipitation for the hour, mm. */
+  precip: number;
+  /** Chance of precipitation, %. */
+  precipProb: number;
   sun: SunPos;
 }
 
@@ -97,6 +110,8 @@ export interface Weather {
     rh: number;
     windSpd: number;
     windDir: number;
+    /** Current precipitation, mm. */
+    precip: number;
     isDay: number;
     sun: SunPos | null;
   };

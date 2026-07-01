@@ -1,17 +1,18 @@
 import { useStore } from "../../store/useStore";
 import { useDerived } from "../../state/derived";
-import { compassName, windowFacing } from "../../lib/geometry";
-import { classifyHour, fmt, maxIndoor, sunOnWindow } from "../../lib/recommend";
+import { classifyHour, fmt, flatIndoorTemp } from "../../lib/recommend";
+import { buildStrategy, MASS_LABEL } from "../../lib/strategy";
 import type { Hour } from "../../types";
 
 export function Timeline() {
   const { docEff: doc } = useDerived();
   const weather = useStore((s) => s.weather);
 
-  if (!weather || doc.rooms.length === 0)
-    return <p className="muted">Add rooms + location for an hourly plan.</p>;
+  if (!weather) return <p className="muted">Add a location for an hourly plan.</p>;
+  const indoorT = flatIndoorTemp(doc);
+  if (indoorT == null)
+    return <p className="muted">Add a room temperature (or a quick indoor temp up top) for an hourly plan.</p>;
 
-  const indoorT = maxIndoor(doc.rooms);
   const comfort = +doc.comfort;
   const start = weather.nowIdx;
   const N = Math.min(24, weather.hours.length - start);
@@ -21,65 +22,68 @@ export function Timeline() {
     tmax = Math.max(...temps);
 
   const cls = (h: Hour) => classifyHour(h, indoorT, comfort, doc.windows, doc.northDeg);
+  const isWet = (h: Hour) => h.precip >= 0.2 || h.precipProb >= 60;
+  const strat = buildStrategy(doc, weather);
 
-  let firstVent: Hour | null = null;
-  slice.forEach((h) => {
-    if (cls(h).vent && firstVent == null) firstVent = h;
-  });
-
-  // summary callouts
+  // ---- synthesized plan (one coherent story, not 24 verdicts) ----
   const parts: string[] = [];
-  const nowVent = cls(slice[0]).vent;
-  if (nowVent) {
-    let end: Hour | null = null;
-    for (let i = 0; i < slice.length; i++) {
-      if (!cls(slice[i]).vent) {
-        end = slice[i];
-        break;
-      }
+  if (strat) {
+    const mass = MASS_LABEL[doc.mass];
+    const massTail = strat.run
+      ? strat.longEnough
+        ? ` — <b>${strat.run.length}h</b>, long enough to flush ${mass} walls.`
+        : ` — but only <b>${strat.run.length}h</b>; with ${mass} fabric that barely shifts the walls, so lean on shade & fans too.`
+      : "";
+    if (strat.ventNow && strat.run) {
+      parts.push(
+        `✅ <b>Ventilate now.</b> Open until about <b>${strat.run.endHour ?? "dawn"}${
+          strat.run.endHour != null ? ":00" : ""
+        }</b>${massTail}`,
+      );
+    } else if (strat.run) {
+      parts.push(
+        `⏳ <b>Seal & shade now.</b> Next worthwhile opening ~<b>${strat.run.startHour}:00${
+          strat.run.endHour != null ? `–${strat.run.endHour}:00` : ""
+        }</b> (down to ${fmt(strat.run.minTemp)}° outside)${massTail}`,
+      );
+    } else {
+      parts.push(`🟠 Outside stays warmer than your rooms for the next ${N}h — keep it sealed and shaded; rely on fans.`);
     }
-    parts.push(
-      `✅ <b>Ventilate now.</b>${end ? ` Window of opportunity until about <b>${end.hour}:00</b> (then it stops helping).` : ""}`,
-    );
-  } else if (firstVent) {
-    const fv = firstVent as Hour;
-    parts.push(`⏳ Next good time to open up: <b>${fv.hour}:00</b> (drops to ${fmt(fv.temp)}° outside).`);
-  } else {
-    parts.push(
-      `🟠 Outside stays warmer than your rooms for the next ${N}h — keep it sealed and shaded; rely on fans.`,
-    );
+    parts.push(`🌙 Coolest hour ahead: <b>${strat.coolest.hour}:00</b> at ${fmt(strat.coolest.temp)}° — the moment to flush heat.`);
+    if (strat.rainHours.length) {
+      const hrs = strat.rainHours.slice(0, 3).map((h) => `${h}:00`).join(", ");
+      parts.push(`🌧 Rain likely around <b>${hrs}</b> — a downpour is the best free cooling of the day; open right after it passes.`);
+    }
+    if (strat.shadeSides.length) {
+      parts.push(`☀️ Sun will hit your <b>${strat.shadeSides.join(", ")}</b> window(s) — shade them before it arrives.`);
+    }
   }
-  let coolH = slice[0];
-  for (const h of slice) if (h.temp < coolH.temp) coolH = h;
-  parts.push(`🌙 Coolest hour ahead: <b>${coolH.hour}:00</b> at ${fmt(coolH.temp)}° — best moment to flush heat.`);
-  const sunWins = new Set<string>();
-  slice.forEach((h) => {
-    if (h.rad > 120)
-      doc.windows.forEach((w) => {
-        if (sunOnWindow(w, h.sun, doc.northDeg)) sunWins.add(compassName(windowFacing(w, doc.northDeg)));
-      });
-  });
-  if (sunWins.size) parts.push(`☀️ Sun will hit your <b>${[...sunWins].join(", ")}</b> window(s) — shade them before it arrives.`);
 
   return (
     <>
       <div className="timeline">
         {slice.map((h, i) => {
           const c = cls(h);
+          const wet = isWet(h);
           const frac = tmax > tmin ? (h.temp - tmin) / (tmax - tmin) : 0.5;
           const bh = 18 + frac * 46;
+          const shadows: string[] = [];
+          if (c.anySun) shadows.push("inset 0 3px 0 var(--sun)");
+          if (wet) shadows.push("inset 0 -4px 0 var(--accent)");
           return (
             <div
               className="tcol"
               key={i}
-              title={`${h.hour}:00 — ${fmt(h.temp)}° outside · ${c.vent ? "ventilate" : "seal"}${c.anySun ? " · sun on glass" : ""}`}
+              title={`${h.hour}:00 — ${fmt(h.temp)}° outside · ${c.vent ? "ventilate" : "seal"}${
+                c.anySun ? " · sun on glass" : ""
+              }${wet ? " · rain" : ""}`}
             >
               <div
                 className="tcol__bar"
                 style={{
                   height: bh,
                   background: c.vent ? "var(--good)" : "var(--warn)",
-                  boxShadow: c.anySun ? "inset 0 3px 0 var(--sun)" : undefined,
+                  boxShadow: shadows.length ? shadows.join(", ") : undefined,
                 }}
               />
             </div>
@@ -108,6 +112,10 @@ export function Timeline() {
         <span>
           <span className="swatch" style={{ background: "var(--sun)" }} />
           Sun on glass
+        </span>
+        <span>
+          <span className="swatch" style={{ background: "var(--accent)" }} />
+          Rain
         </span>
       </div>
     </>

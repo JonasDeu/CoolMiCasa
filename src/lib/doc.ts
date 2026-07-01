@@ -9,6 +9,8 @@ export function defaultDoc(): Doc {
     ceilingH: 2.5,
     fanCount: 2,
     canSealFan: false,
+    mass: "medium",
+    quickIndoorTemp: null,
     rooms: [],
     windows: [],
     doors: [],

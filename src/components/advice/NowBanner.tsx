@@ -2,14 +2,16 @@ import { useMemo } from "react";
 import { useStore } from "../../store/useStore";
 import { useDerived } from "../../state/derived";
 import { compassName } from "../../lib/geometry";
-import { fmt, maxIndoor, nowHour, ventilate } from "../../lib/recommend";
+import { flatIndoorRh, fmt, nowHour, planVent } from "../../lib/recommend";
 
 /**
  * The headline. A big, color-coded verdict — OPEN UP / SEAL IT / HOLD — with the
  * three numbers that justify it. This is the first thing the user should read.
+ * The verdict weighs humidity and rain, not dry-bulb temperature alone, and is
+ * driven by measured rooms (falling back to estimates only when there are none).
  */
 export function NowBanner() {
-  const { docEff: doc } = useDerived();
+  const { docEff: doc, temps } = useDerived();
   const weather = useStore((s) => s.weather);
   const status = useStore((s) => s.weatherStatus);
 
@@ -21,14 +23,28 @@ export function NowBanner() {
     if (status === "error" || !weather) return { mood: "idle" as const, head: "Weather unavailable", sub: "The forecast lookup failed — check your connection and try again." };
 
     const h = nowHour(weather);
-    const indoorMax = maxIndoor(doc.rooms);
     const outdoor = h ? h.temp : weather.current.temp;
+    const outRh = h ? h.rh : weather.current.rh;
     const comfort = +doc.comfort;
-    const globalVent = ventilate(outdoor, indoorMax, comfort);
-    const wd = weather.current.windDir,
-      ws = weather.current.windSpd;
 
-    const mood = globalVent ? ("open" as const) : outdoor > (indoorMax ?? outdoor) ? ("seal" as const) : ("hold" as const);
+    // Prefer measured rooms for the headline so one estimated hot room can't flip the verdict.
+    let indoorMax: number | null;
+    let indoorEstimated = false;
+    if (doc.rooms.length) {
+      const measured = doc.rooms.filter((r) => !temps[r.id]?.estimated);
+      const pool = measured.length ? measured : doc.rooms;
+      indoorMax = Math.max(...pool.map((r) => +r.temp));
+      indoorEstimated = measured.length === 0;
+    } else {
+      const q = doc.quickIndoorTemp;
+      indoorMax = q != null && Number.isFinite(+q) ? +q : null;
+      indoorEstimated = indoorMax != null; // a typed quick guess, not a reading
+    }
+    const indoorRh = flatIndoorRh(doc);
+
+    const plan = planVent(outdoor, outRh, indoorMax, indoorRh, comfort, h ? h.precip : weather.current.precip, h ? h.precipProb : null);
+
+    const mood = plan.open ? ("open" as const) : outdoor > (indoorMax ?? outdoor) ? ("seal" as const) : ("hold" as const);
     const head =
       mood === "open"
         ? "Open up — it's cooler outside"
@@ -46,19 +62,26 @@ export function NowBanner() {
       h && h.sun && h.sun.altitude > 0
         ? `sun in the ${compassName(h.sun.azimuth)}, ${Math.round(h.sun.altitude)}° up`
         : "sun is down";
+    const dew = plan.outDew != null ? ` · 💧 dew ${Math.round(plan.outDew)}°` : "";
 
     return {
       mood,
       head,
       sub,
+      caveat: plan.caveat,
+      note: indoorEstimated
+        ? doc.rooms.length
+          ? "Based on estimated room temps — add a thermometer reading for a firm call."
+          : "Based on your quick indoor temp — draw rooms for per-room advice."
+        : null,
       kpis: [
         { v: `${fmt(outdoor)}°`, l: "Outdoor" },
-        { v: indoorMax == null ? "—" : `${fmt(indoorMax)}°`, l: "Warmest room" },
+        { v: indoorMax == null ? "—" : `${indoorEstimated ? "~" : ""}${fmt(indoorMax)}°`, l: "Warmest room" },
         { v: `${comfort}°`, l: "Target" },
       ],
-      meta: `💨 Wind ${Math.round(ws)} km/h from ${compassName(wd)} · ☀️ ${sun} · ${weather.tz}`,
+      meta: `💨 Wind ${Math.round(weather.current.windSpd)} km/h from ${compassName(weather.current.windDir)} · ☀️ ${sun}${dew} · ${weather.tz}`,
     };
-  }, [doc, weather, status]);
+  }, [doc, weather, status, temps]);
 
   return (
     <div className={`now-banner now-banner--${view.mood}`}>
@@ -69,6 +92,8 @@ export function NowBanner() {
         <div>
           <div className="now-banner__head">{view.head}</div>
           <div className="now-banner__sub">{view.sub}</div>
+          {view.caveat && <div className="now-banner__caveat">{view.caveat}</div>}
+          {view.note && <div className="now-banner__meta">ⓘ {view.note}</div>}
           {view.meta && <div className="now-banner__meta">{view.meta}</div>}
         </div>
       </div>

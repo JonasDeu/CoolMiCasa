@@ -2,10 +2,13 @@ import { useStore } from "../../store/useStore";
 import { useDerived } from "../../state/derived";
 import { compassName, windowFacing } from "../../lib/geometry";
 import {
+  flatIndoorRh,
+  flatIndoorTemp,
   fmt,
   hasCrossVentilation,
-  maxIndoor,
   nowHour,
+  planVent,
+  roomMuggyNote,
   roomTarget,
   sunOnWindow,
   ventilate,
@@ -19,73 +22,106 @@ export function ActionList() {
 
   if (!doc.location) return <p className="muted">Add a location (top-left) to fetch outdoor temperature.</p>;
   if (!weather) return <p className="muted">Loading weather…</p>;
-  if (doc.rooms.length === 0) return <p className="muted">Draw at least one room and type its temperature.</p>;
 
   const h = nowHour(weather);
   const comfort = +doc.comfort;
-  const indoorMax = maxIndoor(doc.rooms);
   const outdoor = h ? h.temp : weather.current.temp;
-  const globalVent = ventilate(outdoor, indoorMax, comfort);
+  const outRh = h ? h.rh : weather.current.rh;
+  const precip = h ? h.precip : weather.current.precip;
+  const precipProb = h ? h.precipProb : null;
   const wd = weather.current.windDir,
     ws = weather.current.windSpd;
+
+  const indoorFlat = flatIndoorTemp(doc);
+  const flatPlan = planVent(outdoor, outRh, indoorFlat, flatIndoorRh(doc), comfort, precip, precipProb);
   const anyEst = doc.rooms.some((r) => temps[r.id]?.estimated);
+
+  const wholeFlat = flatPlan.open ? (
+    <div className="rec">
+      <div className="rec__ttl">
+        Whole flat <Pill kind="open">VENTILATE</Pill>
+      </div>
+      <ul>
+        <li>
+          Open windows wide and{" "}
+          {hasCrossVentilation(doc.windows, doc.northDeg)
+            ? "open the doors between rooms (incl. the hallway) for a cross-breeze"
+            : "open internal doors to let air move through"}
+          .
+        </li>
+        <li>Goal: flush the day's heat while outside ({fmt(outdoor)}°) is below your rooms.</li>
+        <li>👉 See the fan plan below for exactly where to put fans and at what height.</li>
+      </ul>
+      {flatPlan.caveat && <div className="caveat">{flatPlan.caveat}</div>}
+    </div>
+  ) : (
+    <div className="rec">
+      <div className="rec__ttl">
+        Whole flat <Pill kind="closed">KEEP CLOSED</Pill>
+      </div>
+      <ul>
+        <li>Close windows on the warm/sunny sides to trap the cool you banked overnight.</li>
+        <li>Use fans to move indoor air (a breeze feels ~3°C cooler) — don't draw in the hot outside air.</li>
+        <li>Reopen when outside drops below your room temp (see the timeline).</li>
+      </ul>
+      {flatPlan.caveat && <div className="caveat">{flatPlan.caveat}</div>}
+    </div>
+  );
+
+  // No plan drawn yet — still give the whole-flat verdict from a quick indoor temp.
+  if (doc.rooms.length === 0) {
+    if (indoorFlat == null)
+      return (
+        <p className="muted">
+          Draw at least one room and type its temperature — or set a quick indoor temp (top-left) for an instant verdict.
+        </p>
+      );
+    return (
+      <>
+        {wholeFlat}
+        <p className="muted">
+          👉 Draw your rooms &amp; windows (Plan tab) for per-room open/close/shade advice and a fan plan.
+        </p>
+      </>
+    );
+  }
 
   return (
     <>
       {anyEst && (
         <div className="warnbox">
-          Some rooms have no sensor and are <b>estimated</b> (shown with ~). Double-click a room on the map to enter a real
-          reading for sharper advice.
+          Some rooms have no sensor and are <b>estimated</b> (shown with ~ and a range). Double-click a room on the map to
+          enter a real reading for sharper advice.
         </div>
       )}
 
-      {globalVent ? (
-        <div className="rec">
-          <div className="rec__ttl">
-            Whole flat <Pill kind="open">VENTILATE</Pill>
-          </div>
-          <ul>
-            <li>
-              Open windows wide and{" "}
-              {hasCrossVentilation(doc.windows, doc.northDeg)
-                ? "open the doors between rooms (incl. the hallway) for a cross-breeze"
-                : "open internal doors to let air move through"}
-              .
-            </li>
-            <li>Goal: flush the day's heat while outside ({fmt(outdoor)}°) is below your rooms.</li>
-            <li>👉 See the fan plan below for exactly where to put fans and at what height.</li>
-          </ul>
-        </div>
-      ) : (
-        <div className="rec">
-          <div className="rec__ttl">
-            Whole flat <Pill kind="closed">KEEP CLOSED</Pill>
-          </div>
-          <ul>
-            <li>Close windows on the warm/sunny sides to trap the cool you banked overnight.</li>
-            <li>Use fans to move indoor air (a breeze feels ~3°C cooler) — don't draw in the hot outside air.</li>
-            <li>Reopen when outside drops below your room temp (see the timeline).</li>
-          </ul>
-        </div>
-      )}
+      {wholeFlat}
 
       {doc.rooms.map((r) => {
         const wins = doc.windows.filter((w) => w.roomId === r.id);
         const indoorT = +r.temp;
         const target = roomTarget(doc, r);
         const warm = indoorT >= target;
-        const est = temps[r.id]?.estimated;
+        const estT = temps[r.id];
+        const est = estT?.estimated;
+        const muggy = roomMuggyNote(indoorT, r.rh ?? null);
         return (
-          <div className="rec" key={r.id}>
+          <div className={`rec${est ? " rec--est" : ""}`} key={r.id}>
             <div className="rec__ttl">
               <span>{r.name}</span>
               <span className="muted">
                 {est && "~"}
                 {isFinite(indoorT) ? fmt(indoorT) + "°" : "—"}
-                {est && <span className="tag"> est</span>} <span className="tag">/ {fmt(target)}° target</span>{" "}
-                {warm ? "🔥" : "✅"}
+                {est && estT?.lo != null && (
+                  <span className="tag">
+                    {" "}
+                    ({fmt(estT.lo)}–{fmt(estT.hi)}° est)
+                  </span>
+                )}{" "}
+                <span className="tag">/ {fmt(target)}° target</span> {warm ? "🔥" : "✅"}
               </span>
             </div>
+            {muggy && <div className="caveat">{muggy}</div>}
             <ul>
               {wins.length === 0 && <li className="tag">No windows drawn. Use the Window tool to add one.</li>}
               {wins.map((w) => {
@@ -102,6 +138,12 @@ export function ActionList() {
                 }
                 if (ventilate(outT, indoorT, target)) {
                   const role = windRole(windowFacing(w, doc.northDeg), wd, ws);
+                  const wp = planVent(outT, outRh, indoorT, r.rh ?? null, target, precip, precipProb);
+                  const humid = wp.importsMoisture
+                    ? " · 💧 cooler but humid"
+                    : wp.muggyOutside
+                      ? " · 💧 humid air"
+                      : "";
                   return (
                     <li key={w.id}>
                       <Pill kind="open">OPEN</Pill> {facing} window
@@ -110,7 +152,7 @@ export function ActionList() {
                         : role === "leeward"
                           ? " (good spot for a fan blowing out)"
                           : ""}
-                      .
+                      {humid}.
                     </li>
                   );
                 }

@@ -1,5 +1,6 @@
 import type { Doc, Hour, Room, SunPos, Weather, WindowItem } from "../types";
 import { angDiff, compassName, roomById, windowFacing } from "./geometry";
+import { dewPointC, DEW_MARGIN, MUGGY_DEW, muggyLevel } from "./humidity";
 
 export function nowHour(weather: Weather | null): Hour | null {
   return weather ? weather.hours[weather.nowIdx] : null;
@@ -24,6 +25,100 @@ export function ventilate(
   return outdoorT <= indoorT - 1 && indoorT > comfort - 0.5
     ? true
     : outdoorT <= indoorT - 1 && outdoorT < comfort;
+}
+
+/** Rain is falling / imminent enough that you can't just throw the windows wide. */
+export function isRaining(precipMm: number | null | undefined, precipProb: number | null | undefined): boolean {
+  return (precipMm != null && precipMm >= 0.2) || (precipProb != null && precipProb >= 60);
+}
+
+/** Warmest-room / quick-start indoor temperature for whole-flat reasoning. */
+export function flatIndoorTemp(doc: Doc): number | null {
+  if (doc.rooms.length) return maxIndoor(doc.rooms);
+  const q = doc.quickIndoorTemp;
+  return q != null && Number.isFinite(+q) ? +q : null;
+}
+
+/** Average measured/effective indoor humidity across rooms that have a hygrometer, else null. */
+export function flatIndoorRh(doc: Doc): number | null {
+  const vals = doc.rooms
+    .map((r) => r.rh)
+    .filter((v): v is number => v != null && Number.isFinite(+v))
+    .map((v) => +v);
+  return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+}
+
+export interface VentPlan {
+  /** Final call: is opening worthwhile right now? */
+  open: boolean;
+  /** Dry-bulb gate on its own (before humidity/rain). */
+  tempOpen: boolean;
+  /** How much cooler it is outside, °C (indoor − outdoor; negative = hotter out). */
+  tempGain: number;
+  outDew: number | null;
+  inDew: number | null;
+  /** Opening would raise indoor moisture noticeably (needs an indoor hygrometer). */
+  importsMoisture: boolean;
+  /** Outdoor air is muggy in absolute terms. */
+  muggyOutside: boolean;
+  raining: boolean;
+  /** One-line caveat to show beneath the verdict, or null when there's nothing to add. */
+  caveat: string | null;
+}
+
+/**
+ * Whether to ventilate, weighing temperature AND moisture AND rain — not dry-bulb alone.
+ * Temperature still leads (importing some humidity to get real cooling is usually worth it),
+ * but a barely-cooler, much-muggier swap is downgraded, and rain is always flagged.
+ */
+export function planVent(
+  outT: number | null,
+  outRh: number | null,
+  inT: number | null,
+  inRh: number | null,
+  comfort: number,
+  precipMm: number | null,
+  precipProb: number | null,
+): VentPlan {
+  const tempOpen = ventilate(outT, inT, comfort);
+  const tempGain = inT != null && outT != null ? inT - outT : 0;
+  const outDew = outT != null && outRh != null ? dewPointC(outT, outRh) : null;
+  const inDew = inT != null && inRh != null ? dewPointC(inT, inRh) : null;
+  const importsMoisture = outDew != null && inDew != null && outDew > inDew + DEW_MARGIN;
+  const muggyOutside = outDew != null && outDew >= MUGGY_DEW;
+  const raining = isRaining(precipMm, precipProb);
+
+  // A marginal temperature win that trades away a lot of dryness isn't worth it.
+  const marginal = tempOpen && importsMoisture && tempGain < 2;
+  const open = tempOpen && !marginal;
+
+  let caveat: string | null = null;
+  if (raining && open) {
+    caveat = "🌧 Rain about — open only sheltered/leeward windows a crack so you don't let water in.";
+  } else if (marginal) {
+    caveat = "💧 Only a touch cooler but much more humid outside — not worth the mugginess; stay sealed.";
+  } else if (open && importsMoisture) {
+    caveat = "💧 Cooler but more humid outside — you'll import some stickiness; open for the biggest temperature drop, then close.";
+  } else if (open && muggyOutside && inDew == null) {
+    caveat = `💧 Outside air is humid (dew point ${Math.round(outDew as number)}°). Worth it for the temperature, but it'll feel sticky — a hygrometer would sharpen this call.`;
+  } else if (open && inDew != null && outDew != null && outDew < inDew - DEW_MARGIN) {
+    caveat = "💧 Bonus: outside is cooler AND drier right now — ideal, flush the flat.";
+  } else if (raining) {
+    caveat = "🌧 Rain about — a downpour is great free cooling; be ready to open right after it passes.";
+  }
+
+  return { open, tempOpen, tempGain, outDew, inDew, importsMoisture, muggyOutside, raining, caveat };
+}
+
+/** Text label for the moisture level of a room, when its humidity is known. */
+export function roomMuggyNote(tempC: number | null, rh: number | null): string | null {
+  if (tempC == null || rh == null) return null;
+  const dew = dewPointC(tempC, rh);
+  const lvl = muggyLevel(dew);
+  if (lvl === "comfortable") return null;
+  return lvl === "oppressive"
+    ? `💧 Air feels oppressive (dew point ${Math.round(dew)}°) — a breeze will help, drying it needs cooler air or a dehumidifier.`
+    : `💧 Air feels muggy (dew point ${Math.round(dew)}°).`;
 }
 
 export function sunOnWindow(win: WindowItem, sun: SunPos | null, northDeg: number): boolean {

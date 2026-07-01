@@ -108,8 +108,8 @@ export function buildFanPlan(doc: Doc, weather: Weather | null, air: AirflowResu
         dir: v,
         heightM: +exH.toFixed(2),
         heightName: canSeal
-          ? `HIGH — sealed into the top of the window opening (${exTop.toFixed(1)} m above floor)`
-          : `As HIGH as it'll stand — on a shelf/sill just inside the open window, aimed OUT (~${exH.toFixed(1)} m)`,
+          ? "HIGH — sealed into the top of the window opening"
+          : "As high as it'll stand — on a shelf or sill just inside the open window, aimed OUT",
         label: `${canSeal ? "Box fan" : "Fan"}: ${r?.name ?? "room"}, ${compassName(windowFacing(ew, doc.northDeg))} window — blow OUT`,
         why: canSeal
           ? "Your engine. Seal it into the window blowing out so hot air can't loop back in. Hot air floats to the ceiling, so exhausting high harnesses the stack effect and pulls cool air in through every low opening."
@@ -133,8 +133,8 @@ export function buildFanPlan(doc: Doc, weather: Weather | null, air: AirflowResu
           dir: { x: -v.x, y: -v.y },
           heightM: +inH.toFixed(2),
           heightName: canSeal
-            ? `LOW — sealed into the window at the sill (${inSill.toFixed(1)} m above floor)`
-            : `LOW — on the floor right by the open window, aimed in & slightly down (~${inH.toFixed(1)} m)`,
+            ? "LOW — sealed into the window at the sill"
+            : "LOW — on the floor by the open window, aimed in and slightly down",
           label: `${canSeal ? "Box fan" : "Fan"}: ${r?.name ?? "room"}, ${compassName(windowFacing(iw, doc.northDeg))} window — blow IN`,
           why: canSeal
             ? "No wind, so force the intake. Seal it into the opening (its back must face outside to grab cool air), blowing in and angled slightly down. Cool night air is dense and sinks, so this floods the floor and feeds the high exhaust."
@@ -178,7 +178,7 @@ export function buildFanPlan(doc: Doc, weather: Weather | null, air: AirflowResu
             y: d.y - uy * back,
             dir: { x: ux, y: uy },
             heightM: mh,
-            heightName: `MID (~${mh.toFixed(1)} m) — stand it ~½ m BEFORE the doorway, aimed through it`,
+            heightName: "Chest height — stand it about half a metre BEFORE the doorway, aimed through it",
             label: `Booster fan: ${roomById(rooms, lp.roomPath[i])?.name} → ${roomById(rooms, lp.roomPath[i + 1])?.name} doorway`,
             why: "Don't jam it in the gap. A fan blows a tight jet but only sucks diffusely, so set it back ~½ m on the upstream side and shoot the jet through the doorway. The moving jet entrains surrounding air (jet-pump / Bernoulli effect), pushing far more through the constriction than the fan's own output.",
             prio: air.calm ? 4 : 2,
@@ -210,7 +210,7 @@ export function buildFanPlan(doc: Doc, weather: Weather | null, air: AirflowResu
         y: d.y - uy * back,
         dir: { x: ux, y: uy },
         heightM: mh,
-        heightName: `MID (~${mh.toFixed(1)} m) — ~½ m back on the breezy side, aimed through the doorway`,
+        heightName: "Chest height — about half a metre back on the breezy side, aimed through the doorway",
         label: `Doorway fan: push air into ${rname}`,
         why: `${rname} is off the main breeze. ${d.open ? "" : "Open this door, then "}stand a fan a bit before the doorway on the ventilated side and shoot the jet through — it entrains room air and drags fresh air in. Don't block the gap with it.`,
         prio: 5,

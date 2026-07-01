@@ -10,6 +10,8 @@ import {
   winTop,
 } from "../../lib/geometry";
 import { fmt } from "../../lib/recommend";
+import { dewPointC, MUGGY_DEW } from "../../lib/humidity";
+import { estimateAsUnmeasured } from "../../lib/temps";
 import type { Side } from "../../types";
 import { Card, Hint } from "../ui";
 
@@ -18,6 +20,7 @@ const SIDE_LABEL: Record<Side, string> = { N: "top", E: "right", S: "bottom", W:
 export function SelectionCard() {
   const selection = useStore((s) => s.selection);
   const doc = useStore((s) => s.doc);
+  const weather = useStore((s) => s.weather);
   const { temps } = useDerived();
   const updateRoom = useStore((s) => s.updateRoom);
   const updateWindow = useStore((s) => s.updateWindow);
@@ -36,7 +39,9 @@ export function SelectionCard() {
     const r = roomById(doc.rooms, selection.id);
     if (!r) return null;
     const hasSensor = r.measured !== false;
+    const hasHygro = r.rh != null && Number.isFinite(+r.rh);
     const estimate = temps[r.id];
+    const modeled = hasSensor && Number.isFinite(+r.temp) ? estimateAsUnmeasured(doc, r.id, weather) : null;
     return (
       <Card title="Selected room">
         <label>Room name</label>
@@ -61,11 +66,62 @@ export function SelectionCard() {
               onChange={(e) => updateRoom(r.id, { temp: parseFloat(e.target.value) })}
             />
             <Hint>Or double-click the room on the map to type it there.</Hint>
+            {modeled != null && Number.isFinite(+r.temp) && (
+              <Hint>
+                🔎 The model would guess <b>~{fmt(modeled)}°</b> here from your other rooms (you measured {fmt(r.temp)}°,{" "}
+                {r.temp - modeled >= 0 ? "+" : ""}
+                {fmt(r.temp - modeled)}°).{" "}
+                {Math.abs(r.temp - modeled) >= 2
+                  ? "Big gap → trust the estimated rooms elsewhere less."
+                  : "Close → the estimates elsewhere are probably reliable."}
+              </Hint>
+            )}
           </>
         ) : (
           <Hint>
-            No sensor → estimated at <b>~{estimate ? fmt(estimate.value) : "—"}°</b> from your measured rooms and the sun.
-            Tick the box above if you can measure it.
+            No sensor → estimated at <b>~{estimate ? fmt(estimate.value) : "—"}°</b>
+            {estimate?.lo != null && (
+              <>
+                {" "}
+                (range {fmt(estimate.lo)}–{fmt(estimate.hi)}°)
+              </>
+            )}{" "}
+            from your measured rooms and the sun. Tick the box above if you can measure it.
+          </Hint>
+        )}
+
+        <label className="checkbox">
+          <input
+            type="checkbox"
+            checked={hasHygro}
+            onChange={(e) => updateRoom(r.id, { rh: e.target.checked ? 55 : null })}
+          />{" "}
+          I have a hygrometer in this room
+        </label>
+        {hasHygro ? (
+          <>
+            <label>Measured humidity (% RH)</label>
+            <input
+              type="number"
+              step={1}
+              min={0}
+              max={100}
+              value={r.rh ?? ""}
+              onChange={(e) => updateRoom(r.id, { rh: e.target.value === "" ? null : parseFloat(e.target.value) })}
+            />
+            {Number.isFinite(+r.temp) && r.rh != null && (
+              <Hint>
+                Dew point <b>{fmt(dewPointC(+r.temp, +r.rh))}°</b>
+                {dewPointC(+r.temp, +r.rh) >= MUGGY_DEW
+                  ? " — muggy indoors; opening up only helps comfort if the outside air is drier."
+                  : " — comfortably dry air."}
+              </Hint>
+            )}
+          </>
+        ) : (
+          <Hint>
+            Optional. With a reading, the app compares indoor vs outdoor dew point and warns when opening the windows would
+            trade a small temperature drop for a lot more humidity.
           </Hint>
         )}
 

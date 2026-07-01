@@ -547,6 +547,32 @@ button.full {
   border-color: #2f4a63;
   background: linear-gradient(180deg, rgba(47, 74, 99, 0.25), var(--surface-2));
 }
+/* estimated (no-sensor) rooms render softer + dashed to signal lower confidence */
+.rec--est {
+  opacity: 0.85;
+  border-style: dashed;
+  border-color: var(--line-soft);
+}
+/* a one-line inline caveat (humidity / rain / mugginess) under a verdict */
+.caveat {
+  margin-top: 6px;
+  font-size: 12.5px;
+  color: #d7e6f5;
+  background: rgba(94, 198, 255, 0.08);
+  border-left: 3px solid var(--accent);
+  border-radius: 4px;
+  padding: 5px 8px;
+}
+.now-banner__caveat {
+  margin-top: 6px;
+  font-size: 13px;
+  color: #eaf3fb;
+  background: rgba(94, 198, 255, 0.1);
+  border-left: 3px solid var(--accent);
+  border-radius: 6px;
+  padding: 5px 9px;
+  max-width: 60ch;
+}
 .airflow-summary > div {
   margin-bottom: 6px;
 }
