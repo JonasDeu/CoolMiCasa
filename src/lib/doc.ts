@@ -8,7 +8,6 @@ export function defaultDoc(): Doc {
     comfort: 24,
     ceilingH: 2.5,
     fanCount: 2,
-    pxPerM: 50,
     canSealFan: false,
     rooms: [],
     windows: [],

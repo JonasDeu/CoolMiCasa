@@ -5,12 +5,10 @@ export function SettingsCard() {
   const comfort = useStore((s) => s.doc.comfort);
   const ceilingH = useStore((s) => s.doc.ceilingH);
   const fanCount = useStore((s) => s.doc.fanCount);
-  const pxPerM = useStore((s) => s.doc.pxPerM);
   const canSealFan = useStore((s) => s.doc.canSealFan);
   const setComfort = useStore((s) => s.setComfort);
   const setCeiling = useStore((s) => s.setCeiling);
   const setFanCount = useStore((s) => s.setFanCount);
-  const setPxPerM = useStore((s) => s.setPxPerM);
   const setCanSealFan = useStore((s) => s.setCanSealFan);
 
   return (
@@ -33,12 +31,6 @@ export function SettingsCard() {
         onChange={(e) => setCeiling(parseFloat(e.target.value) || 2.5)}
       />
       <Hint>Drives the stack effect: a taller gap between a low intake and a high exhaust gives a stronger draft.</Hint>
-
-      <label>
-        Map scale: <b>1 m = {pxPerM} px</b>
-      </label>
-      <input type="range" min={20} max={120} value={pxPerM} onChange={(e) => setPxPerM(+e.target.value)} />
-      <Hint>Slide so the rooms read at a believable size — the scale bar &amp; room dimensions on the map update live.</Hint>
 
       <label>Portable fans you own</label>
       <input

@@ -61,8 +61,6 @@ export interface Doc {
   ceilingH: number;
   /** Number of portable fans the user owns. */
   fanCount: number;
-  /** Map scale: canvas pixels per real-world metre. */
-  pxPerM: number;
   /** Can the user seal a fan into a window opening? Most cheap fans can't. */
   canSealFan: boolean;
   rooms: Room[];

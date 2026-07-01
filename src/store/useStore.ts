@@ -77,7 +77,6 @@ export interface AppState {
   setCeiling: (v: number) => void;
   setFanCount: (v: number) => void;
   setNorth: (v: number) => void;
-  setPxPerM: (v: number) => void;
   setCanSealFan: (v: boolean) => void;
   setLocation: (loc: LatLon | null) => void;
   setWeather: (w: Weather | null, status: AppState["weatherStatus"]) => void;
@@ -144,11 +143,6 @@ export const useStore = create<AppState>()(
     setNorth: (v) =>
       set((s) => {
         s.doc.northDeg = v;
-        persist(s.doc);
-      }),
-    setPxPerM: (v) =>
-      set((s) => {
-        s.doc.pxPerM = Math.max(10, Math.min(200, v));
         persist(s.doc);
       }),
     setCanSealFan: (v) =>

@@ -5,6 +5,7 @@ import {
   compassName,
   doorWallVertical,
   outwardVec,
+  PX_PER_M,
   roomById,
   windowFacing,
   windowMid,
@@ -31,6 +32,10 @@ const COLORS = {
 export interface DrawOpts {
   width: number;
   height: number;
+  /** Pan offset in canvas px — the whole scene is translated by this. */
+  view: Pt;
+  /** View zoom factor — a pure display scale applied after the pan translate. */
+  zoom: number;
   doc: Doc;
   weather: Weather | null;
   air: AirflowResult | null;
@@ -39,27 +44,38 @@ export interface DrawOpts {
   temps: RoomTempMap;
 }
 
-export function drawScene(ctx: CanvasRenderingContext2D, o: DrawOpts) {
-  const { width, height, doc, weather, air, fanSpots, selection, temps } = o;
-  const h = nowHour(weather);
-  const pxPerM = doc.pxPerM || 50;
-  ctx.clearRect(0, 0, width, height);
-
-  // grid
+/** The map grid — drawn in viewport space but scrolled with the pan offset and scaled by zoom. */
+function drawGrid(ctx: CanvasRenderingContext2D, width: number, height: number, view: Pt, zoom: number) {
+  const G = 30 * zoom;
+  const ox = ((view.x % G) + G) % G;
+  const oy = ((view.y % G) + G) % G;
   ctx.strokeStyle = COLORS.grid;
   ctx.lineWidth = 1;
-  for (let x = 0; x < width; x += 30) {
+  for (let x = ox; x < width; x += G) {
     ctx.beginPath();
     ctx.moveTo(x, 0);
     ctx.lineTo(x, height);
     ctx.stroke();
   }
-  for (let y = 0; y < height; y += 30) {
+  for (let y = oy; y < height; y += G) {
     ctx.beginPath();
     ctx.moveTo(0, y);
     ctx.lineTo(width, y);
     ctx.stroke();
   }
+}
+
+export function drawScene(ctx: CanvasRenderingContext2D, o: DrawOpts) {
+  const { width, height, view, zoom, doc, weather, air, fanSpots, selection, temps } = o;
+  const h = nowHour(weather);
+  ctx.clearRect(0, 0, width, height);
+
+  drawGrid(ctx, width, height, view, zoom);
+
+  // everything below is in map coordinates: it pans with the view and scales with the zoom
+  ctx.save();
+  ctx.translate(view.x, view.y);
+  ctx.scale(zoom, zoom);
 
   // rooms
   for (const r of doc.rooms) {
@@ -83,11 +99,11 @@ export function drawScene(ctx: CanvasRenderingContext2D, o: DrawOpts) {
     ctx.fillText(r.name, r.x + 8, r.y + 18);
 
     // dimensions in metres (top-right of the room)
-    if (pxPerM > 0 && r.w > 70) {
+    if (r.w > 70) {
       ctx.fillStyle = COLORS.textMuted;
       ctx.font = "10px system-ui";
       ctx.textAlign = "right";
-      ctx.fillText(`${(r.w / pxPerM).toFixed(1)}×${(r.h / pxPerM).toFixed(1)} m`, r.x + r.w - 6, r.y + 15);
+      ctx.fillText(`${(r.w / PX_PER_M).toFixed(1)}×${(r.h / PX_PER_M).toFixed(1)} m`, r.x + r.w - 6, r.y + 15);
       ctx.textAlign = "start";
     }
 
@@ -104,6 +120,15 @@ export function drawScene(ctx: CanvasRenderingContext2D, o: DrawOpts) {
       ctx.font = "italic 10px system-ui";
       ctx.fillText("est.", r.x + 13 + wpx, r.y + 37);
     }
+
+    // target temperature (double-click the room to change it)
+    if (r.h > 66) {
+      const custom = r.target != null;
+      ctx.fillStyle = custom ? "#bcd0e6" : COLORS.textMuted;
+      ctx.font = (custom ? "700 " : "600 ") + "11px system-ui";
+      ctx.fillText(`🎯 ${target}°`, r.x + 8, r.y + 55);
+    }
+
     if (air && air.active) {
       const tag = air.flowRooms.has(r.id)
         ? "✓ cross-flow"
@@ -158,20 +183,33 @@ export function drawScene(ctx: CanvasRenderingContext2D, o: DrawOpts) {
     ctx.fillStyle = COLORS.textMuted;
     ctx.font = "10px system-ui";
     ctx.fillText(compassName(windowFacing(w, doc.northDeg)), m.x - 6, m.y - 9);
+
+    // outdoor temp (double-click the window to set it); muted dash when unset
+    const v = outwardVec(w.side);
+    const tx = m.x + v.x * 18 - 8,
+      ty = m.y + v.y * 18 + 4;
     if (w.temp != null) {
-      const v = outwardVec(w.side);
       ctx.fillStyle = "#7fd0ff";
       ctx.font = "700 11px system-ui";
-      ctx.fillText(w.temp + "°", m.x + v.x * 16 - 8, m.y + v.y * 16 + 4);
+      ctx.fillText(w.temp + "°", tx, ty);
+    } else {
+      ctx.fillStyle = COLORS.textMuted;
+      ctx.font = "600 11px system-ui";
+      ctx.fillText("—°", tx, ty);
     }
   }
 
   drawAirflow(ctx, air);
   drawDoors(ctx, doc, air, selection);
   drawGhostFans(ctx, fanSpots, doc.fanCount || 0);
+
+  ctx.restore();
+
+  // viewport-pinned overlays (never pan or zoom)
   drawCompass(ctx, doc.northDeg, width);
   drawSun(ctx, doc.northDeg, h, width);
-  drawScaleBar(ctx, pxPerM, width, height);
+  // the bar reflects the on-screen scale, so it tracks the zoom
+  drawScaleBar(ctx, PX_PER_M * zoom, width, height);
 }
 
 /** Pick a round number of metres (1/2/5 × 10ⁿ) whose bar is ≈ targetPx wide. */

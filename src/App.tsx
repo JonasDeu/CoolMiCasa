@@ -75,10 +75,12 @@ export function App() {
 
           {/* FLOOR PLAN */}
           <main className="col col--plan">
-            <div className="canvas-wrap">
-              <Toolbar />
-              <FloorPlanCanvas />
-              {flashMsg && <div className="toast">{flashMsg}</div>}
+            <div className="canvas-area">
+              <div className="canvas-wrap">
+                <Toolbar />
+                <FloorPlanCanvas />
+                {flashMsg && <div className="toast">{flashMsg}</div>}
+              </div>
             </div>
             <Legend />
           </main>

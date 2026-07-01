@@ -1,5 +1,12 @@
 import type { Door, Pt, Room, Side, WindowItem } from "../types";
 
+/**
+ * Fixed canvas pixels per real-world metre. Room geometry is stored in canvas px;
+ * this is the single conversion to metres. On-screen size is controlled by the
+ * view zoom (a pure display transform), never by changing this ratio.
+ */
+export const PX_PER_M = 50;
+
 export const SIDE_OFFSET: Record<Side, number> = { N: 0, E: 90, S: 180, W: 270 };
 const COMPASS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
 

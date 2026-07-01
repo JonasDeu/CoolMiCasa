@@ -2,6 +2,7 @@ import { useStore } from "../../store/useStore";
 import { useDerived } from "../../state/derived";
 import {
   compassName,
+  PX_PER_M,
   roomById,
   windowFacing,
   winHeight,
@@ -36,7 +37,6 @@ export function SelectionCard() {
     if (!r) return null;
     const hasSensor = r.measured !== false;
     const estimate = temps[r.id];
-    const pxPerM = doc.pxPerM || 50;
     return (
       <Card title="Selected room">
         <label>Room name</label>
@@ -80,7 +80,7 @@ export function SelectionCard() {
         <Hint>Blank = use the default ({doc.comfort}°). A bedroom you want cooler at night can have its own target.</Hint>
 
         <Hint>
-          Size: <b>{(r.w / pxPerM).toFixed(1)} × {(r.h / pxPerM).toFixed(1)} m</b>. Name a corridor “Hallway” so airflow
+          Size: <b>{(r.w / PX_PER_M).toFixed(1)} × {(r.h / PX_PER_M).toFixed(1)} m</b>. Name a corridor “Hallway” so airflow
           routes through it.
         </Hint>
         {del}

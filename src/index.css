@@ -362,6 +362,9 @@ button.full {
   box-shadow: var(--shadow);
   touch-action: none;
 }
+.floorplan-canvas.is-panning {
+  cursor: grabbing;
+}
 .toolbar__tools {
   position: absolute;
   top: 10px;
@@ -412,23 +415,71 @@ button.full {
   padding: 6px 10px;
   max-width: min(440px, calc(100% - 20px));
 }
+/* zoom controls — pinned to the right edge, clear of the compass (top) and scale bar (bottom) */
+.zoom-ctl {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px;
+  background: rgba(11, 18, 25, 0.82);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: var(--shadow-sm);
+}
+.zoom-ctl button {
+  min-width: 34px;
+  padding: 6px 0;
+  text-align: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  color: #cfe0f0;
+  font-size: 15px;
+  line-height: 1;
+}
+.zoom-ctl button:hover {
+  background: var(--surface-2);
+  border-color: var(--line);
+}
+.zoom-ctl__level {
+  font-size: 11px !important;
+  font-weight: 700;
+  color: var(--text-muted, #9fb4c9);
+}
 .temp-edit {
   position: absolute;
   z-index: 5;
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 4px;
   background: rgba(11, 18, 25, 0.96);
   border: 1px solid var(--accent);
   border-radius: 8px;
-  padding: 3px 6px;
+  padding: 6px 8px;
   box-shadow: var(--shadow);
 }
+.temp-edit__row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.temp-edit__row label {
+  min-width: 48px;
+  margin: 0;
+  font-size: 11px;
+  color: var(--muted);
+}
 .temp-edit input {
-  width: 66px;
+  width: 72px;
   padding: 4px 6px;
 }
-.temp-edit span {
+.temp-edit__row span {
   color: var(--muted);
   font-size: 12px;
 }
@@ -660,27 +711,78 @@ button.full {
 
 /* ============================================================
    Desktop — three columns, no tab bar
+   The page itself never scrolls; only the left & right columns do.
    ============================================================ */
 @media (min-width: 1025px) {
+  .app {
+    height: 100vh;
+    overflow: hidden;
+  }
+  /* compact headline so it doesn't eat the vertical budget */
+  .now-banner {
+    margin: 10px 16px 0;
+    padding: 10px 16px;
+    gap: 12px;
+  }
+  .now-banner__icon {
+    font-size: 24px;
+  }
+  .now-banner__head {
+    font-size: 17px;
+  }
+  .now-banner__sub {
+    margin-top: 1px;
+    font-size: 13px;
+  }
+  .now-banner__meta {
+    margin-top: 3px;
+  }
+  .now-banner__kpis .kpi {
+    padding: 6px 12px;
+  }
+  .now-banner__kpis .kpi__v {
+    font-size: 17px;
+  }
   .layout {
     display: grid;
     grid-template-columns: 300px minmax(440px, 1fr) 380px;
+    grid-template-rows: minmax(0, 1fr);
     gap: 16px;
-    align-items: start;
+    align-items: stretch;
     padding: 16px;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
   }
+  /* left & right columns scroll independently within the viewport */
   .col {
     display: flex !important;
-    position: sticky;
-    top: 64px;
-    max-height: calc(100vh - 80px);
+    height: 100%;
+    min-height: 0;
     overflow: auto;
     padding-bottom: 8px;
   }
+  /* middle column fits its canvas to the available height — no scroll */
   .col--plan {
-    position: static;
-    max-height: none;
-    overflow: visible;
+    overflow: hidden;
+  }
+  .canvas-area {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+  }
+  .canvas-wrap {
+    height: 100%;
+    aspect-ratio: 900 / 620;
+    max-width: 100%;
+    max-height: 100%;
+  }
+  .col--plan .floorplan-canvas {
+    width: 100%;
+    height: 100%;
+    aspect-ratio: auto;
   }
   .tabbar {
     display: none;
