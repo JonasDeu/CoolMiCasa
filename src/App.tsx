@@ -12,6 +12,7 @@ import { LocationCard } from "./components/setup/LocationCard";
 import { SettingsCard } from "./components/setup/SettingsCard";
 import { OrientationCard } from "./components/setup/OrientationCard";
 import { TemplatesCard } from "./components/setup/TemplatesCard";
+import { SaveLoadCard } from "./components/setup/SaveLoadCard";
 import { SelectionCard } from "./components/setup/SelectionCard";
 import { FloorPlanCanvas } from "./components/floorplan/FloorPlanCanvas";
 import { Toolbar } from "./components/floorplan/Toolbar";
@@ -66,6 +67,7 @@ export function App() {
           <aside className="col col--setup">
             <LocationCard />
             <TemplatesCard />
+            <SaveLoadCard />
             <SettingsCard />
             <OrientationCard />
             {selection && <SelectionCard />}

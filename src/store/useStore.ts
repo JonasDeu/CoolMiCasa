@@ -4,32 +4,10 @@ import type { Doc, LatLon, Pt, Selection, Tool, Weather } from "../types";
 import { uid } from "../lib/id";
 import { nearestRoom, roomById, snapDoorPos, snapWindow, twoNearestRooms } from "../lib/geometry";
 import { TEMPLATES, templateById } from "../lib/templates";
+import { defaultDoc, markLoadedRoomsMeasured } from "../lib/doc";
 
 const SKEY = "coolmicasa.v2";
 const SKEY_V1 = "coolmicasa.v1";
-
-function defaultDoc(): Doc {
-  return {
-    location: null,
-    northDeg: 0,
-    comfort: 24,
-    ceilingH: 2.5,
-    fanCount: 2,
-    pxPerM: 50,
-    canSealFan: false,
-    rooms: [],
-    windows: [],
-    doors: [],
-  };
-}
-
-/** Rooms loaded/seeded without an explicit `measured` flag are treated as real readings. */
-function markLoadedRoomsMeasured(d: Doc): Doc {
-  d.rooms.forEach((r) => {
-    if (r.measured === undefined) r.measured = true;
-  });
-  return d;
-}
 
 function seedDoc(): Doc {
   const d = defaultDoc();
@@ -134,6 +112,7 @@ export interface AppState {
   pushUndo: () => void;
   undo: () => void;
   applyTemplate: (id: string) => void;
+  loadLayout: (doc: Doc) => void;
   resetAll: () => void;
 }
 
@@ -393,6 +372,15 @@ export const useStore = create<AppState>()(
         persist(s.doc);
       });
     },
+    loadLayout: (doc) =>
+      set((s) => {
+        s.undoStack.push(JSON.stringify(s.doc));
+        if (s.undoStack.length > 40) s.undoStack.shift();
+        s.doc = doc;
+        s.selection = null;
+        s.flashMsg = "Layout loaded — press Ctrl+Z to undo.";
+        persist(s.doc);
+      }),
     resetAll: () =>
       set((s) => {
         s.doc = seedDoc();
