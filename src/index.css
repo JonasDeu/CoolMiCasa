@@ -400,21 +400,6 @@ button.full {
 .toolbar__icon {
   font-size: 15px;
 }
-.toolbar__hint {
-  position: absolute;
-  left: 10px;
-  bottom: 10px;
-  z-index: 2;
-  pointer-events: none;
-  font-size: 12px;
-  color: #cfe0f0;
-  background: rgba(11, 18, 25, 0.82);
-  backdrop-filter: blur(8px);
-  border: 1px solid var(--line-soft);
-  border-radius: 8px;
-  padding: 6px 10px;
-  max-width: min(440px, calc(100% - 20px));
-}
 /* zoom controls — pinned to the right edge, clear of the compass (top) and scale bar (bottom) */
 .zoom-ctl {
   position: absolute;
@@ -862,6 +847,65 @@ button.full {
 }
 .help-dialog li {
   margin: 6px 0;
+}
+
+/* ---- settings dialog ---- */
+.settings-dialog {
+  max-width: 520px;
+  width: calc(100% - 32px);
+  max-height: 85vh;
+  overflow: auto;
+  background: var(--surface);
+  color: var(--txt);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 20px;
+  box-shadow: var(--shadow);
+}
+.settings-dialog::backdrop {
+  background: rgba(4, 9, 14, 0.6);
+  backdrop-filter: blur(2px);
+}
+.settings-dialog__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.settings-dialog__head button {
+  padding: 4px 10px;
+}
+.settings-dialog__body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* ---- header action buttons ---- */
+.appbar__actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 10px;
+  white-space: nowrap;
+}
+
+/* On phones the appbar can't fit five labelled actions: let it wrap and collapse
+   the safe actions to icon-only. Reset keeps its label (destructive). */
+@media (max-width: 720px) {
+  .appbar {
+    flex-wrap: wrap;
+  }
+  .appbar__sub {
+    display: none;
+  }
+  .appbar__actions button .btn-label {
+    display: none;
+  }
+  .appbar__actions button {
+    padding: 6px 9px;
+  }
 }
 
 /* ============================================================

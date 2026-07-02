@@ -39,7 +39,12 @@ computeRoomTemps(doc, weather)        → per-room effective temps (+ estimated 
 withEffectiveTemps(doc, temps)        → docEff: a copy of doc with room.temp replaced
 analyzeAirflow(docEff, weather)       → intake/exhaust/flow rooms, BFS breeze paths, door suggestions
 buildFanPlan(docEff, weather, air)    → exact fan positions, heights, and the "why" physics blurb
+planOpenings(docEff, weather, air)    → per-window sash + blind verdicts, per-door open/close advice
 ```
+
+`planOpenings` is the single source of truth for open/close/shade calls: the canvas
+badges (`draw.ts`) and the advice list (`ActionList`) both render its verdicts, and its
+window sashes follow `air.openWins` exactly so the physics and the advice never diverge.
 
 Everything downstream of `computeRoomTemps` operates on **`docEff`, never the raw `doc`**.
 This is the key indirection: rooms are either *measured* (real thermometer reading) or

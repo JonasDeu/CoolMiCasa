@@ -30,6 +30,8 @@ export interface Waypoints {
 }
 
 export interface DoorSuggestion {
+  /** The door's id, so downstream verdicts can match it. */
+  id: string;
   aName: string;
   bName: string;
   /** True when opening this door would bring a priority room onto the cross-breeze. */
@@ -277,7 +279,7 @@ export function analyzeAirflow(doc: Doc, weather: Weather | null): AirflowResult
         const ra = roomById(doc.rooms, d.roomA),
           rb = roomById(doc.rooms, d.roomB);
         if (ra && rb)
-          res.doorSuggest.push({ aName: ra.name, bName: rb.name, priority: !!(ra.priority || rb.priority) });
+          res.doorSuggest.push({ id: d.id, aName: ra.name, bName: rb.name, priority: !!(ra.priority || rb.priority) });
       }
     });
   // Surface the doors that connect a priority room to the breeze first.

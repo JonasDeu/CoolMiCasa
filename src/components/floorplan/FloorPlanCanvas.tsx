@@ -45,7 +45,7 @@ export function FloorPlanCanvas() {
   const rawDoc = useStore((s) => s.doc); // raw stored values for the inline editors
   const updateRoom = useStore((s) => s.updateRoom);
   const updateWindow = useStore((s) => s.updateWindow);
-  const { docEff: doc, temps, air, plan } = useDerived();
+  const { docEff: doc, temps, air, plan, openings } = useDerived();
 
   // redraw whenever anything visible changes; while airflow or fan spots are on
   // screen, keep a ~30fps loop running so the flow dashes crawl along their paths
@@ -54,8 +54,9 @@ export function FloorPlanCanvas() {
     if (!cv) return;
     const ctx = cv.getContext("2d");
     if (!ctx) return;
-    const opts = { width: CW, height: CH, view, zoom, doc, weather, air, fanSpots: plan.spots, selection, temps };
-    const animated = (air.active && air.paths.length > 0) || plan.spots.length > 0;
+    const opts = { width: CW, height: CH, view, zoom, doc, weather, air, openings, fanSpots: plan.spots, selection, temps };
+    // keep the ~30fps loop alive while flow dashes, fan jets or door-change pulses are visible
+    const animated = (air.active && air.paths.length > 0) || plan.spots.length > 0 || openings.doorChanges > 0;
     let raf = 0,
       last = -Infinity;
     const frame = (t: number) => {
@@ -68,7 +69,7 @@ export function FloorPlanCanvas() {
     drawScene(ctx, { ...opts, now: performance.now() });
     if (animated) raf = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(raf);
-  }, [doc, weather, air, plan, selection, temps, view, zoom]);
+  }, [doc, weather, air, plan, openings, selection, temps, view, zoom]);
 
   // close the inline editor when clicking anywhere outside it
   useEffect(() => {

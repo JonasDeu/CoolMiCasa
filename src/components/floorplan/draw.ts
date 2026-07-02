@@ -1,5 +1,6 @@
 import type { AirflowResult } from "../../lib/airflow";
 import type { FanSpot } from "../../lib/fanPlan";
+import type { OpeningsPlan } from "../../lib/openings";
 import type { Doc, Pt, Selection, Weather } from "../../types";
 import {
   compassName,
@@ -42,6 +43,8 @@ export interface DrawOpts {
   doc: Doc;
   weather: Weather | null;
   air: AirflowResult | null;
+  /** Per-window sash/blind and per-door open/close verdicts. */
+  openings: OpeningsPlan;
   fanSpots: FanSpot[];
   selection: Selection;
   temps: RoomTempMap;
@@ -71,7 +74,7 @@ function drawGrid(ctx: CanvasRenderingContext2D, width: number, height: number, 
 }
 
 export function drawScene(ctx: CanvasRenderingContext2D, o: DrawOpts) {
-  const { width, height, view, zoom, doc, weather, air, fanSpots, selection, temps, now } = o;
+  const { width, height, view, zoom, doc, weather, air, openings, fanSpots, selection, temps, now } = o;
   const h = nowHour(weather);
   ctx.clearRect(0, 0, width, height);
 
@@ -241,7 +244,8 @@ export function drawScene(ctx: CanvasRenderingContext2D, o: DrawOpts) {
       ctx.fillText("kipp", m.x - 6 + ctx.measureText(facing).width + 4, m.y - 9);
     }
 
-    // outdoor temp (double-click the window to set it); muted dash when unset
+    // outdoor temp: a manually-set value (bright blue), else the live forecast (muted);
+    // dash only when there's no forecast either. Double-click a window to override it.
     const v = outwardVec(w.side);
     const tx = m.x + v.x * 18 - 8,
       ty = m.y + v.y * 18 + 4;
@@ -252,13 +256,39 @@ export function drawScene(ctx: CanvasRenderingContext2D, o: DrawOpts) {
     } else {
       ctx.fillStyle = COLORS.textMuted;
       ctx.font = "600 11px system-ui";
-      ctx.fillText("—°", tx, ty);
+      ctx.fillText(h ? Math.round(h.temp) + "°" : "—°", tx, ty);
+    }
+
+    // explicit verdict: OPEN / CLOSE / SHADE badge, plus a blind bar while it should be down
+    const ov = openings.windows[w.id];
+    if (ov) {
+      if (ov.blind === "down") {
+        ctx.strokeStyle = COLORS.shade;
+        ctx.lineWidth = 3.5;
+        ctx.beginPath();
+        ctx.moveTo(seg.x1 + v.x * 7, seg.y1 + v.y * 7);
+        ctx.lineTo(seg.x2 + v.x * 7, seg.y2 + v.y * 7);
+        ctx.stroke();
+      }
+      const label = ov.sash === "open" ? "OPEN" : ov.sunHit ? "SHADE" : "CLOSE";
+      const col = ov.sash === "open" ? COLORS.good : ov.sunHit ? COLORS.sun : COLORS.warn;
+      // sit clear of the temp label: further out on the wall normal, dropped a little on E/W walls
+      const bx = m.x + v.x * 34,
+        by = m.y + v.y * 34 + (v.y === 0 ? 15 : 0);
+      badge(ctx, bx, by, label, col);
+      if (ov.noShade) {
+        ctx.fillStyle = COLORS.warn;
+        ctx.font = "700 9px system-ui";
+        ctx.textAlign = "center";
+        ctx.fillText("⚠ no blind", bx, by + 17);
+        ctx.textAlign = "start";
+      }
     }
   }
 
   drawAirflow(ctx, air, now);
   drawWindowFlows(ctx, doc, air);
-  drawDoors(ctx, doc, air, selection);
+  drawDoors(ctx, doc, air, openings, selection, now);
   drawFans(ctx, fanSpots, doc.fanCount || 0, now);
 
   ctx.restore();
@@ -305,6 +335,34 @@ function drawScaleBar(ctx: CanvasRenderingContext2D, pxPerM: number, width: numb
   ctx.textAlign = "center";
   ctx.fillText(`${m} m`, (x1 + x2) / 2, y - 8);
   ctx.textAlign = "start";
+  ctx.restore();
+}
+
+/** Small rounded chip with colored text on a dark backing — the canvas twin of the UI pill. */
+function badge(ctx: CanvasRenderingContext2D, cx: number, cy: number, text: string, col: string) {
+  ctx.save();
+  ctx.font = "700 9px system-ui";
+  const w = ctx.measureText(text).width + 10,
+    h = 14,
+    r = 4;
+  const x = cx - w / 2,
+    y = cy - h / 2;
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+  ctx.fillStyle = "rgba(11,18,25,.85)";
+  ctx.fill();
+  ctx.strokeStyle = col;
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.fillStyle = col;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(text, cx, cy + 0.5);
   ctx.restore();
 }
 
@@ -380,7 +438,9 @@ function drawDoors(
   ctx: CanvasRenderingContext2D,
   doc: Doc,
   air: AirflowResult | null,
+  openings: OpeningsPlan,
   selection: Selection,
+  now: number,
 ) {
   const tick = (x: number, y: number, dx: number, dy: number) => {
     ctx.beginPath();
@@ -467,10 +527,26 @@ function drawDoors(
       ctx.lineTo(x2, y2);
       ctx.stroke();
     }
+    // state label, plus the verdict: ✓ when the state matches the advice,
+    // a pulsing ring + "→ OPEN / → SHUT" hint when the user should flip it.
+    const dv = openings.doors[d.id];
+    const ok = dv?.want != null && !dv.change;
     ctx.fillStyle = d.open ? (onPath ? "#9fe0ff" : "#7fe0bd") : "#ff9d8f";
     ctx.font = "700 9px system-ui";
     ctx.textAlign = "center";
-    ctx.fillText(d.open ? "OPEN" : "SHUT", d.x, vert ? y2 + 13 : y1 - 7);
+    ctx.fillText((d.open ? "OPEN" : "SHUT") + (ok ? " ✓" : ""), d.x, vert ? y2 + 13 : y1 - 7);
+    if (dv?.change) {
+      const col = dv.want === "open" ? COLORS.good : COLORS.bad;
+      ctx.strokeStyle = col;
+      ctx.lineWidth = 2.5;
+      ctx.globalAlpha = 0.45 + 0.35 * Math.sin(now / 260);
+      ctx.beginPath();
+      ctx.arc(d.x, d.y, half + 9, 0, 7);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = col;
+      ctx.fillText(dv.want === "open" ? "→ OPEN" : "→ SHUT", d.x, vert ? y2 + 24 : y1 - 18);
+    }
     ctx.textAlign = "start";
     ctx.restore();
   }

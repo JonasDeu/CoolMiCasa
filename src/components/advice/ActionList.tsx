@@ -10,14 +10,13 @@ import {
   planVent,
   roomMuggyNote,
   roomTarget,
-  sunOnWindow,
-  ventilate,
-  windRole,
 } from "../../lib/recommend";
 import { Pill } from "../ui";
 
+const hh = (hour: number) => `${String(hour).padStart(2, "0")}:00`;
+
 export function ActionList() {
-  const { docEff: doc, temps } = useDerived();
+  const { docEff: doc, temps, openings } = useDerived();
   const weather = useStore((s) => s.weather);
 
   if (!doc.location) return <p className="muted">Add a location (top-left) to fetch outdoor temperature.</p>;
@@ -29,8 +28,6 @@ export function ActionList() {
   const outRh = h ? h.rh : weather.current.rh;
   const precip = h ? h.precip : weather.current.precip;
   const precipProb = h ? h.precipProb : null;
-  const wd = weather.current.windDir,
-    ws = weather.current.windSpd;
 
   const indoorFlat = flatIndoorTemp(doc);
   const flatPlan = planVent(outdoor, outRh, indoorFlat, flatIndoorRh(doc), comfort, precip, precipProb);
@@ -86,6 +83,13 @@ export function ActionList() {
     );
   }
 
+  // per-door verdicts: things to flip first, then confirmations
+  const doorRows = doc.doors.flatMap((d) => {
+    const v = openings.doors[d.id];
+    return v && v.want ? [{ d, v }] : [];
+  });
+  doorRows.sort((a, b) => Number(b.v.change) - Number(a.v.change) || Number(b.v.priority) - Number(a.v.priority));
+
   return (
     <>
       {anyEst && (
@@ -96,6 +100,33 @@ export function ActionList() {
       )}
 
       {wholeFlat}
+
+      {doorRows.length > 0 && (
+        <div className="rec">
+          <div className="rec__ttl">
+            <span>🚪 Doors</span>
+            <span className="muted">
+              {openings.doorChanges > 0
+                ? `${openings.doorChanges} to flip — shown pulsing on the map`
+                : "all in the right position ✓"}
+            </span>
+          </div>
+          <ul>
+            {doorRows.map(({ d, v }) => (
+              <li key={d.id}>
+                <Pill kind={v.want === "open" ? "open" : "closed"}>{v.want === "open" ? "OPEN" : "CLOSE"}</Pill>{" "}
+                {v.priority ? "⭐ " : ""}
+                <b>{v.aName}</b> ↔ <b>{v.bName}</b> — {v.reason}.
+                {v.change ? (
+                  <span className="accent"> Currently {d.open ? "open" : "shut"} — double-click it on the map to flip.</span>
+                ) : (
+                  <span className="tag"> ✓ already {d.open ? "open" : "shut"}.</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {doc.rooms.map((r) => {
         const wins = doc.windows.filter((w) => w.roomId === r.id);
@@ -131,44 +162,41 @@ export function ActionList() {
             <ul>
               {wins.length === 0 && <li className="tag">No windows drawn. Use the Window tool to add one.</li>}
               {wins.map((w) => {
-                const outT = w.temp != null ? +w.temp : outdoor;
-                const sunHit = !!h && sunOnWindow(w, h.sun, doc.northDeg) && h.rad > 120;
+                const ov = openings.windows[w.id];
+                if (!ov) return null;
                 const facing = compassName(windowFacing(w, doc.northDeg));
-                if (sunHit) {
+                if (ov.sunHit && ov.sash === "close") {
                   return (
                     <li key={w.id}>
                       <Pill kind="shade">SHADE</Pill> {facing} window — sun is on the glass.
-                      {w.shade ? " Close the blind/curtain." : " ⚠️ No shade fitted; improvise (cardboard, towel, foil) outside the glass if you can."}
+                      {w.shade ? " Keep the blind/curtain down." : " ⚠️ No shade fitted; improvise (cardboard, towel, foil) outside the glass if you can."}
+                      {ov.sunFlipH != null && <span className="tag"> Sun moves off ≈ {hh(ov.sunFlipH)}.</span>}
                     </li>
                   );
                 }
-                if (ventilate(outT, indoorT, target)) {
-                  const role = windRole(windowFacing(w, doc.northDeg), wd, ws);
-                  const outRhW = w.rh != null ? +w.rh : outRh;
-                  const wp = planVent(outT, outRhW, indoorT, r.rh ?? null, target, precip, precipProb);
-                  const humid = wp.importsMoisture
-                    ? " · 💧 cooler but humid"
-                    : wp.muggyOutside
-                      ? " · 💧 humid air"
-                      : "";
+                if (ov.sash === "open") {
                   return (
                     <li key={w.id}>
-                      <Pill kind="open">OPEN</Pill> {facing} window
-                      {role === "windward"
+                      <Pill kind="open">OPEN</Pill> {facing} window — {ov.reason}
+                      {ov.wind === "windward"
                         ? " (breeze blows in here — main intake)"
-                        : role === "leeward"
+                        : ov.wind === "leeward"
                           ? " (good spot for a fan blowing out)"
                           : ""}
-                      {humid}.
-                      {w.opening === "tilt" && (
-                        <span className="tag"> · only tilted (kipp) → limited airflow; swing it fully open to flush faster.</span>
+                      .
+                      {ov.note && <span className="tag"> · {ov.note}.</span>}
+                      {w.shade && ov.sunFlipH != null && (
+                        <span className="tag"> · ☀️ sun hits this glass ≈ {hh(ov.sunFlipH)} — drop the blind then.</span>
                       )}
                     </li>
                   );
                 }
                 return (
                   <li key={w.id}>
-                    <Pill kind="closed">CLOSE</Pill> {facing} window — outside not cooler.
+                    <Pill kind="closed">CLOSE</Pill> {facing} window — {ov.reason}.
+                    {w.shade && ov.sunFlipH != null && (
+                      <span className="tag"> ☀️ sun hits ≈ {hh(ov.sunFlipH)} — have the blind down by then.</span>
+                    )}
                   </li>
                 );
               })}

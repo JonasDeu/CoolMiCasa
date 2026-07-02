@@ -290,9 +290,10 @@ function sealedPlan(doc: Doc, weather: Weather): FanPlan {
     });
   }
 
-  // Mixing: borrow air from a notably cooler neighbour through an open internal door.
+  // Mixing: borrow air from a notably cooler neighbour through an internal door —
+  // but never drain a cool priority room to warm an ordinary one (the openings
+  // advice keeps that door shut for the same reason).
   for (const d of doc.doors) {
-    if (!d.open) continue;
     const a = roomById(rooms, d.roomA),
       b = roomById(rooms, d.roomB);
     if (!a || !b) continue;
@@ -300,6 +301,7 @@ function sealedPlan(doc: Doc, weather: Weather): FanPlan {
     const cool = warm === a ? b : a;
     const dT = +warm.temp - +cool.temp;
     if (dT < 1.5 || +warm.temp <= roomTarget(doc, warm)) continue;
+    if (cool.priority && !warm.priority) continue;
     const from = roomCenter(cool),
       to = roomCenter(warm);
     const L = Math.hypot(to.x - from.x, to.y - from.y) || 1;
@@ -311,7 +313,7 @@ function sealedPlan(doc: Doc, weather: Weather): FanPlan {
       y: d.y - uy * 26,
       dir: { x: ux, y: uy },
       heightM: chest,
-      place: "~½ m before the doorway on the cool side, aimed into the warm room",
+      place: `~½ m before the ${d.open ? "" : "closed (open it!) "}doorway on the cool side, aimed into the warm room`,
       label: `even out: ${cool.name} → ${warm.name}${warm.priority ? " ⭐" : ""}`,
       why: `${cool.name} is ${dT.toFixed(1)}° cooler — borrow its air until the two rooms even out.`,
       benefit: clamp01(0.25 + dT / 6 + (warm.priority ? 0.1 : 0)),

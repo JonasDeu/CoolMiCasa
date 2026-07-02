@@ -36,6 +36,11 @@ export function HelpDialog({ open, onClose }: Props) {
           → exhaust). Rooms off the path are flagged stagnant.
         </li>
         <li>
+          <b>Follow the badges</b> — every window gets an explicit OPEN / CLOSE / SHADE call (a purple bar means: blind
+          down), and every door shows a ✓ when it's in the right position or a pulsing <b>→ OPEN</b> / <b>→ SHUT</b> hint
+          when you should flip it (double-click the door).
+        </li>
+        <li>
           <b>Say how many fans you have</b> — the app ranks the best spots and heights: exhaust high where hot air pools
           (stack effect), intake low for cool night air, and a doorway booster where air accelerates (Bernoulli).
         </li>

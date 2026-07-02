@@ -9,12 +9,9 @@ import { ActionList } from "./components/advice/ActionList";
 import { FanPlanPanel } from "./components/advice/FanPlanPanel";
 import { RoomForecast } from "./components/advice/RoomForecast";
 import { Timeline } from "./components/advice/Timeline";
-import { LocationCard } from "./components/setup/LocationCard";
-import { SettingsCard } from "./components/setup/SettingsCard";
-import { OrientationCard } from "./components/setup/OrientationCard";
 import { TemplatesCard } from "./components/setup/TemplatesCard";
-import { SaveLoadCard } from "./components/setup/SaveLoadCard";
 import { SelectionCard } from "./components/setup/SelectionCard";
+import { SettingsDialog } from "./components/setup/SettingsDialog";
 import { FloorPlanCanvas } from "./components/floorplan/FloorPlanCanvas";
 import { Toolbar } from "./components/floorplan/Toolbar";
 import { Card } from "./components/ui";
@@ -31,6 +28,7 @@ export function App() {
   const deleteItem = useStore((s) => s.deleteItem);
 
   const [help, setHelp] = useState(false);
+  const [settings, setSettings] = useState(false);
   const [tab, setTab] = useState<Tab>("plan");
 
   // global keyboard: undo + delete (ignored while typing in a field)
@@ -60,19 +58,12 @@ export function App() {
   return (
     <DerivedProvider>
       <div className="app">
-        <Header onHelp={() => setHelp(true)} />
+        <Header onHelp={() => setHelp(true)} onSettings={() => setSettings(true)} />
         <NowBanner />
 
         <div className="layout" data-tab={tab}>
-          {/* SETUP */}
-          <aside className="col col--setup">
-            <LocationCard />
-            <TemplatesCard />
-            <SaveLoadCard />
-            <SettingsCard />
-            <OrientationCard />
-            {selection && <SelectionCard />}
-          </aside>
+          {/* INSPECTOR — the selected item, or Quick-start when nothing is selected */}
+          <aside className="col col--setup">{selection ? <SelectionCard /> : <TemplatesCard />}</aside>
 
           {/* FLOOR PLAN */}
           <main className="col col--plan">
@@ -106,12 +97,13 @@ export function App() {
         <nav className="tabbar">
           {(["setup", "plan", "advice"] as Tab[]).map((t) => (
             <button key={t} className={tab === t ? "is-active" : ""} onClick={() => setTab(t)}>
-              {t === "setup" ? "⚙️ Setup" : t === "plan" ? "🗺 Plan" : "💡 Advice"}
+              {t === "setup" ? "✏️ Edit" : t === "plan" ? "🗺 Plan" : "💡 Advice"}
             </button>
           ))}
         </nav>
 
         <HelpDialog open={help} onClose={() => setHelp(false)} />
+        <SettingsDialog open={settings} onClose={() => setSettings(false)} />
       </div>
     </DerivedProvider>
   );

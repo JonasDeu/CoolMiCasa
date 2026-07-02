@@ -4,6 +4,7 @@ import { analyzeAirflow, type AirflowResult } from "../lib/airflow";
 import { buildFanPlan, type FanPlan } from "../lib/fanPlan";
 import { computeRoomTemps, withEffectiveTemps, type RoomTempMap } from "../lib/temps";
 import { forecastRoomTemps, type ForecastMap } from "../lib/forecast";
+import { planOpenings, type OpeningsPlan } from "../lib/openings";
 import type { Doc } from "../types";
 
 interface Derived {
@@ -13,6 +14,8 @@ interface Derived {
   docEff: Doc;
   air: AirflowResult;
   plan: FanPlan;
+  /** Explicit open/close verdicts for every window sash, blind and internal door. */
+  openings: OpeningsPlan;
   /** Per-room hourly temperature projection for the next ~24 h. */
   forecast: ForecastMap;
 }
@@ -28,8 +31,9 @@ export function DerivedProvider({ children }: { children: ReactNode }) {
     const docEff = withEffectiveTemps(doc, temps);
     const air = analyzeAirflow(docEff, weather);
     const plan = buildFanPlan(docEff, weather, air);
+    const openings = planOpenings(docEff, weather, air);
     const forecast = forecastRoomTemps(docEff, weather, temps);
-    return { temps, docEff, air, plan, forecast };
+    return { temps, docEff, air, plan, openings, forecast };
   }, [doc, weather]);
 
   return <DerivedCtx.Provider value={value}>{children}</DerivedCtx.Provider>;
