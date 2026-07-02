@@ -577,6 +577,90 @@ button.full {
   margin-bottom: 6px;
 }
 
+/* ---- fan plan ---- */
+.fanplan-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.flowmeter {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.flowmeter i {
+  width: 8px;
+  height: 12px;
+  border-radius: 2px;
+  background: #22303f;
+}
+.flowmeter i.on {
+  background: var(--accent);
+}
+.flowmeter .tag {
+  margin-left: 4px;
+}
+.chip {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #1c2a3a;
+  border: 1px solid #2a3a4d;
+  color: #a9c6e2;
+  white-space: nowrap;
+}
+.chip--kind {
+  background: rgba(94, 198, 255, 0.12);
+  border-color: rgba(94, 198, 255, 0.35);
+  color: var(--accent);
+}
+.fanmeta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: 4px 0;
+  font-size: 12px;
+}
+.benefit {
+  width: 46px;
+  height: 6px;
+  flex: none;
+  border-radius: 999px;
+  background: #22303f;
+  overflow: hidden;
+}
+.benefit i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #2f81b8, var(--accent));
+}
+.fan-card--extra {
+  opacity: 0.55;
+}
+.howwork {
+  margin-top: 10px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.howwork summary {
+  cursor: pointer;
+  color: #a9c6e2;
+  font-weight: 600;
+}
+.howwork ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+.howwork li {
+  margin: 4px 0;
+}
+
 /* ---- pills ---- */
 .pill {
   display: inline-block;

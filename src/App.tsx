@@ -122,8 +122,9 @@ function Legend() {
     ["var(--good)", "Open window (ventilate)"],
     ["var(--warn)", "Keep closed"],
     ["var(--sun)", "Direct sun → shade it"],
-    ["var(--shade)", "Window (no verdict yet)"],
-    ["var(--accent)", "Airflow path"],
+    ["#7fd0ff", "Air flowing in"],
+    ["#ffb27a", "Air flowing out"],
+    ["var(--accent)", "Breeze path (flowing dashes)"],
   ];
   return (
     <div className="legend">
@@ -133,7 +134,7 @@ function Legend() {
           {label}
         </span>
       ))}
-      <span>🌀 Fan spot (numbered by priority; bright = use now, grey = extra)</span>
+      <span>🌀 Fan spot (numbered, best first; bright = you own it, grey = extra)</span>
     </div>
   );
 }

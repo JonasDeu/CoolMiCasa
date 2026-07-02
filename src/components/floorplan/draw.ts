@@ -26,6 +26,8 @@ const COLORS = {
   bad: "#ff6b5e",
   sun: "#ffd34d",
   shade: "#9b8cff",
+  flowIn: "#7fd0ff",
+  flowOut: "#ffb27a",
   textBright: "#dfeaf5",
   textMuted: "#9fb4c9",
 };
@@ -43,6 +45,8 @@ export interface DrawOpts {
   fanSpots: FanSpot[];
   selection: Selection;
   temps: RoomTempMap;
+  /** Animation clock, ms (performance.now()) — drives the flowing dashes. */
+  now: number;
 }
 
 /** The map grid — drawn in viewport space but scrolled with the pan offset and scaled by zoom. */
@@ -67,7 +71,7 @@ function drawGrid(ctx: CanvasRenderingContext2D, width: number, height: number, 
 }
 
 export function drawScene(ctx: CanvasRenderingContext2D, o: DrawOpts) {
-  const { width, height, view, zoom, doc, weather, air, fanSpots, selection, temps } = o;
+  const { width, height, view, zoom, doc, weather, air, fanSpots, selection, temps, now } = o;
   const h = nowHour(weather);
   ctx.clearRect(0, 0, width, height);
 
@@ -95,8 +99,10 @@ export function drawScene(ctx: CanvasRenderingContext2D, o: DrawOpts) {
       ctx.restore();
     }
     if (air && air.active) {
-      if (air.flowRooms.has(r.id)) {
-        ctx.fillStyle = "rgba(94,198,255,.12)";
+      const f = air.roomFlow[r.id] ?? 0;
+      if (f > 0.02) {
+        // tint depth tracks how much of the breeze actually serves this room
+        ctx.fillStyle = `rgba(94,198,255,${(0.05 + 0.15 * Math.min(1, f)).toFixed(3)})`;
         ctx.fillRect(r.x, r.y, r.w, r.h);
       } else if (air.stagnant.has(r.id)) {
         ctx.fillStyle = "rgba(255,176,58,.10)";
@@ -250,9 +256,10 @@ export function drawScene(ctx: CanvasRenderingContext2D, o: DrawOpts) {
     }
   }
 
-  drawAirflow(ctx, air);
+  drawAirflow(ctx, air, now);
+  drawWindowFlows(ctx, doc, air);
   drawDoors(ctx, doc, air, selection);
-  drawGhostFans(ctx, fanSpots, doc.fanCount || 0);
+  drawFans(ctx, fanSpots, doc.fanCount || 0, now);
 
   ctx.restore();
 
@@ -312,22 +319,59 @@ function arrowHead(ctx: CanvasRenderingContext2D, a: Pt, b: Pt) {
   ctx.fill();
 }
 
-function drawAirflow(ctx: CanvasRenderingContext2D, air: AirflowResult | null) {
+/** Breeze paths — dash crawl speed, width and opacity all scale with the path's flow share. */
+function drawAirflow(ctx: CanvasRenderingContext2D, air: AirflowResult | null, now: number) {
   if (!air || !air.active) return;
   ctx.save();
-  ctx.fillStyle = "rgba(94,198,255,.9)";
-  ctx.strokeStyle = "rgba(94,198,255,.5)";
-  ctx.lineWidth = 3;
+  ctx.lineCap = "round";
   for (const path of air.paths) {
     const pts = (path.pts || []).filter(Boolean) as Pt[];
     if (pts.length < 2) continue;
-    ctx.setLineDash([6, 5]);
+    const s = Math.max(0.12, Math.min(1, path.strength));
+    const dash = 7 + 6 * s;
+    ctx.strokeStyle = `rgba(94,198,255,${(0.3 + 0.5 * s).toFixed(2)})`;
+    ctx.fillStyle = `rgba(94,198,255,${(0.45 + 0.45 * s).toFixed(2)})`;
+    ctx.lineWidth = 2 + 3 * s;
+    ctx.setLineDash([dash, dash]);
+    ctx.lineDashOffset = -(((now / 1000) * (18 + 70 * s)) % (dash * 2));
     ctx.beginPath();
     ctx.moveTo(pts[0].x, pts[0].y);
     for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
     ctx.stroke();
     ctx.setLineDash([]);
     for (let i = 1; i < pts.length; i++) arrowHead(ctx, pts[i - 1], pts[i]);
+  }
+  ctx.restore();
+}
+
+/** In/out arrows at each open window — cool blue flowing in, warm amber flowing out. */
+function drawWindowFlows(ctx: CanvasRenderingContext2D, doc: Doc, air: AirflowResult | null) {
+  if (!air || !air.active) return;
+  ctx.save();
+  ctx.lineCap = "round";
+  for (const wf of air.flows) {
+    if (wf.strength < 0.03) continue;
+    const m = windowMid(wf.win, doc.rooms);
+    if (!m) continue;
+    const v = outwardVec(wf.win.side);
+    const s = wf.strength;
+    const len = 15 + 17 * s;
+    const isIn = wf.role === "intake";
+    const col = isIn ? COLORS.flowIn : COLORS.flowOut;
+    const from = isIn
+      ? { x: m.x + v.x * len * 0.75, y: m.y + v.y * len * 0.75 }
+      : { x: m.x - v.x * len * 0.45, y: m.y - v.y * len * 0.45 };
+    const to = isIn
+      ? { x: m.x - v.x * len * 0.55, y: m.y - v.y * len * 0.55 }
+      : { x: m.x + v.x * len * 0.9, y: m.y + v.y * len * 0.9 };
+    ctx.strokeStyle = col;
+    ctx.fillStyle = col;
+    ctx.lineWidth = 2 + 2.5 * s;
+    ctx.beginPath();
+    ctx.moveTo(from.x, from.y);
+    ctx.lineTo(to.x, to.y);
+    ctx.stroke();
+    arrowHead(ctx, from, to);
   }
   ctx.restore();
 }
@@ -432,32 +476,58 @@ function drawDoors(
   }
 }
 
-function drawGhostFans(ctx: CanvasRenderingContext2D, spots: FanSpot[], owned: number) {
+/** Fan spots: jet cone showing throw and direction, animated centerline, number badge. */
+function drawFans(ctx: CanvasRenderingContext2D, spots: FanSpot[], owned: number, now: number) {
   spots.forEach((f, idx) => {
     const have = idx < owned;
     const col = have ? "#7ee0ff" : "#5a6b7d";
+    const b = Math.max(0.15, Math.min(1, f.benefit));
     ctx.save();
+    ctx.globalAlpha = have ? 1 : 0.55;
+
+    // translucent jet wedge — length/width scale with the spot's usefulness
+    const L = 36 + 30 * b;
+    const px = -f.dir.y,
+      py = f.dir.x;
+    const half = L * 0.26;
+    const ax = f.x + f.dir.x * 10,
+      ay = f.y + f.dir.y * 10;
+    const bx = f.x + f.dir.x * L,
+      by = f.y + f.dir.y * L;
+    ctx.fillStyle = have ? "rgba(126,224,255,.14)" : "rgba(90,107,125,.12)";
+    ctx.beginPath();
+    ctx.moveTo(ax, ay);
+    ctx.lineTo(bx + px * half, by + py * half);
+    ctx.lineTo(bx - px * half, by - py * half);
+    ctx.closePath();
+    ctx.fill();
+
+    // animated centerline
+    ctx.strokeStyle = col;
+    ctx.lineWidth = 2.5;
+    ctx.lineCap = "round";
+    ctx.setLineDash([5, 6]);
+    ctx.lineDashOffset = -(((now / 1000) * (30 + 50 * b)) % 11);
+    ctx.beginPath();
+    ctx.moveTo(ax, ay);
+    ctx.lineTo(bx, by);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = col;
+    arrowHead(ctx, { x: ax, y: ay }, { x: bx, y: by });
+
+    // fan body
     ctx.setLineDash([3, 3]);
     ctx.strokeStyle = col;
     ctx.lineWidth = 2;
-    ctx.globalAlpha = have ? 1 : 0.6;
     ctx.beginPath();
     ctx.arc(f.x, f.y, 14, 0, 7);
     ctx.stroke();
     ctx.setLineDash([]);
     ctx.font = "16px system-ui";
     ctx.fillText("🌀", f.x - 9, f.y + 6);
-    const L = 32,
-      ex = f.x + f.dir.x * L,
-      ey = f.y + f.dir.y * L;
-    ctx.strokeStyle = col;
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(f.x, f.y);
-    ctx.lineTo(ex, ey);
-    ctx.stroke();
-    ctx.fillStyle = col;
-    arrowHead(ctx, { x: f.x, y: f.y }, { x: ex, y: ey });
+
+    // number badge + height chip
     ctx.fillStyle = have ? "#04263a" : "#0b1219";
     ctx.beginPath();
     ctx.arc(f.x + 12, f.y - 12, 8, 0, 7);
@@ -469,7 +539,7 @@ function drawGhostFans(ctx: CanvasRenderingContext2D, spots: FanSpot[], owned: n
     ctx.textAlign = "start";
     ctx.fillStyle = have ? "#cde6ff" : "#8aa0b6";
     ctx.font = "700 10px system-ui";
-    ctx.fillText("↕ " + f.heightM.toFixed(1) + "m", f.x - 18, f.y - 18);
+    ctx.fillText("↕ " + f.heightM.toFixed(1) + " m", f.x - 18, f.y - 21);
     ctx.restore();
   });
 }

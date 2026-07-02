@@ -47,24 +47,27 @@ export function FloorPlanCanvas() {
   const updateWindow = useStore((s) => s.updateWindow);
   const { docEff: doc, temps, air, plan } = useDerived();
 
-  // redraw whenever anything visible changes (including the pan offset)
+  // redraw whenever anything visible changes; while airflow or fan spots are on
+  // screen, keep a ~30fps loop running so the flow dashes crawl along their paths
   useEffect(() => {
     const cv = canvasRef.current;
     if (!cv) return;
     const ctx = cv.getContext("2d");
     if (!ctx) return;
-    drawScene(ctx, {
-      width: CW,
-      height: CH,
-      view,
-      zoom,
-      doc,
-      weather,
-      air,
-      fanSpots: plan.spots,
-      selection,
-      temps,
-    });
+    const opts = { width: CW, height: CH, view, zoom, doc, weather, air, fanSpots: plan.spots, selection, temps };
+    const animated = (air.active && air.paths.length > 0) || plan.spots.length > 0;
+    let raf = 0,
+      last = -Infinity;
+    const frame = (t: number) => {
+      if (t - last >= 33) {
+        last = t;
+        drawScene(ctx, { ...opts, now: t });
+      }
+      raf = requestAnimationFrame(frame);
+    };
+    drawScene(ctx, { ...opts, now: performance.now() });
+    if (animated) raf = requestAnimationFrame(frame);
+    return () => cancelAnimationFrame(raf);
   }, [doc, weather, air, plan, selection, temps, view, zoom]);
 
   // close the inline editor when clicking anywhere outside it

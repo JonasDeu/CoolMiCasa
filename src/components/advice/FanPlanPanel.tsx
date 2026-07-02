@@ -1,9 +1,15 @@
-import type { AirflowResult } from "../../lib/airflow";
-import { fanSizeNote, type FanPlan } from "../../lib/fanPlan";
+import type { FanKind, FanSpot } from "../../lib/fanPlan";
 import { useStore } from "../../store/useStore";
 import { useDerived } from "../../state/derived";
-import { openArea, roomById } from "../../lib/geometry";
+import { roomById } from "../../lib/geometry";
 import { maxIndoor, nowHour } from "../../lib/recommend";
+
+const KIND_CHIP: Record<FanKind, string> = {
+  exhaust: "BLOW OUT",
+  intake: "BLOW IN",
+  boost: "DOORWAY",
+  personal: "AT YOU",
+};
 
 export function FanPlanPanel() {
   const { air, plan, docEff: doc } = useDerived();
@@ -12,207 +18,130 @@ export function FanPlanPanel() {
   if (!weather) return <p className="muted">Set a location to model airflow and fan placement.</p>;
   if (doc.rooms.length === 0) return <p className="muted">Draw rooms and connect them with the Door tool.</p>;
 
-  const N = doc.fanCount || 0;
+  const owned = doc.fanCount || 0;
   const names = (set: Set<string>) =>
-    [...set].map((r) => roomById(doc.rooms, r)?.name).filter(Boolean) as string[];
+    [...set]
+      .map((id) => roomById(doc.rooms, id)?.name)
+      .filter(Boolean)
+      .join(", ");
+
+  const prio = doc.rooms.filter((r) => r.priority);
+  const prioUnserved = prio.filter((r) => air.stagnant.has(r.id) || air.singleRooms.has(r.id));
+  const h = nowHour(weather);
+  const dT = h ? Math.max(0, (maxIndoor(doc.rooms) || 0) - h.temp) : 0;
+  const st = plan.stack;
 
   return (
     <>
-      {air && air.active ? (
-        <AirflowSummary air={air} plan={plan} names={names} />
-      ) : (
-        <p className="muted">
-          Outside isn't cooler than your rooms — keep windows shut. The fans below are for comfort (moving air feels
-          cooler), not for drawing in outside air.
-        </p>
+      <div className="fanplan-head">
+        <span className={`pill ${plan.mode === "flush" ? "pill--open" : "pill--closed"}`}>
+          {plan.mode === "flush" ? "FLUSH" : "SEALED"}
+        </span>
+        {plan.mode === "flush" && <FlowMeter q={air.Q} />}
+        {plan.until && <span className="chip">⏱ {plan.until}</span>}
+      </div>
+      <p className="hint">{plan.headline}</p>
+
+      {plan.mode === "flush" && (
+        <div className="airflow-summary">
+          {air.paths.length === 0 && (
+            <div>
+              🌬 Windows are open but there's no through-path — you need open windows on two <i>different</i> sides
+              linked by open doors.
+            </div>
+          )}
+          {prioUnserved.length > 0 && (
+            <div className="caveat">
+              ⭐ Off the breeze: <b>{prioUnserved.map((r) => r.name).join(", ")}</b> — the doorway fans below fix that
+              first.
+            </div>
+          )}
+          {air.doorSuggest.slice(0, 2).map((s, i) => (
+            <div className="accent" key={i}>
+              🚪 {s.priority ? "⭐ " : ""}Open the door <b>{s.aName}</b> ↔ <b>{s.bName}</b> to connect the breeze.
+            </div>
+          ))}
+          {air.stagnant.size > 0 && <div className="muted">⚠ No fresh air: {names(air.stagnant)}.</div>}
+          {air.singleRooms.size > 0 && <div className="muted">~ One-sided only: {names(air.singleRooms)}.</div>}
+          {st && st.dH != null && st.dH > 0.2 && (
+            <div className="muted">
+              🌡 Chimney pull: intake {st.inSill!.toFixed(1)} m → exhaust {st.exTop!.toFixed(1)} m (Δh{" "}
+              {st.dH.toFixed(1)} m · ΔT {dT.toFixed(1)}°) — height gap plus inside-vs-out gap drive the free draft.
+            </div>
+          )}
+        </div>
       )}
 
       {plan.spots.length === 0 ? (
-        <p className="muted">No fan needed right now.</p>
-      ) : N === 0 ? (
-        <p className="muted">Set how many portable fans you have (Setup) and I'll place them.</p>
-      ) : (
-        <>
-          <p className="hint">{fanSizeNote(doc.fanSize, !!(air && air.active))}</p>
-          <FanCards plan={plan} owned={N} />
-        </>
+        <p className="muted">
+          {plan.mode === "flush"
+            ? "No fan needed — the natural breeze already covers every room."
+            : "No room is over target — no fan needed right now."}
+        </p>
+      ) : owned === 0 ? (
+        <p className="muted">Set how many fans you own (Setup) and the spots below get ranked for you.</p>
+      ) : null}
+      {plan.spots.map((f, i) => (
+        <FanCard key={i} n={i + 1} f={f} use={i < owned} />
+      ))}
+      {owned > 0 && plan.spots.length > 0 && plan.spots.length < owned && (
+        <p className="hint">
+          Only {plan.spots.length} spot{plan.spots.length > 1 ? "s" : ""} earn a fan right now — spares won't add
+          much.
+        </p>
       )}
+
+      <details className="howwork">
+        <summary>How to place a fan well</summary>
+        <ul>
+          <li>
+            A fan blows a tight jet but sucks diffusely — at doorways stand it <b>~½ m back</b> on the upstream side
+            and shoot the jet through; never jam it into the gap.
+          </li>
+          <li>
+            Window fans work best <b>sealed into the opening</b> (box fan) — otherwise stand them right at the window
+            and stuff a towel into the side gaps so air can't loop straight back.
+          </li>
+          <li>
+            Cool air is dense and hugs the floor; hot air pools at the ceiling — so bring air <b>in low</b> on the cool
+            side and push it <b>out high</b> on the warm side.
+          </li>
+        </ul>
+      </details>
     </>
   );
+}
 
-  function AirflowSummary({
-    air,
-    plan,
-    names,
-  }: {
-    air: AirflowResult;
-    plan: FanPlan;
-    names: (set: Set<string>) => string[];
-  }) {
-    const flow = names(air.flowRooms),
-      stag = names(air.stagnant),
-      single = names(air.singleRooms);
-    const prio = doc.rooms.filter((r) => r.priority);
-    const prioUnserved = prio.filter((r) => air.stagnant.has(r.id) || air.singleRooms.has(r.id));
-    const st = plan.stack;
-    const h = nowHour(weather);
-    return (
-      <div className="airflow-summary">
-        {air.paths.length ? (
-          <div>
-            🌬️ Cross-breeze flowing through: <b>{flow.join(", ") || "—"}</b>.{" "}
-            {air.paths.length > 1 ? "Arrows on the map trace each path through the net." : "Arrows on the map show the path."}
-          </div>
-        ) : (
-          <div>
-            🌬️ Windows are open but there's no through-path — you need open windows on two <i>different</i> sides linked
-            by open doors.
-          </div>
-        )}
-        {prio.length > 0 && (
-          <div className={prioUnserved.length ? "caveat" : "accent"}>
-            ⭐ Priority: <b>{prio.map((r) => r.name).join(", ")}</b>.{" "}
-            {prioUnserved.length > 0
-              ? `Still off the breeze: ${prioUnserved.map((r) => r.name).join(", ")} — fixes below get it first.`
-              : "on the cross-breeze."}
-          </div>
-        )}
-        {single.length > 0 && <div className="muted">~ One-sided airflow (limited): {single.join(", ")}.</div>}
-        {stag.length > 0 && <div className="muted">⚠ Stagnant (no fresh air): {stag.join(", ")}.</div>}
-        {air.doorSuggest.map((s, i) => (
-          <div className="accent" key={i}>
-            🚪 {s.priority ? "⭐ " : ""}Open the door between <b>{s.aName}</b> and <b>{s.bName}</b> to connect the
-            cross-breeze.
-          </div>
-        ))}
+function FlowMeter({ q }: { q: number }) {
+  const label = q >= 0.55 ? "strong" : q >= 0.25 ? "moderate" : q > 0.06 ? "gentle" : "still";
+  const lit = Math.max(q > 0.06 ? 1 : 0, Math.round(q * 5));
+  return (
+    <span className="flowmeter" title={`Natural airflow right now: ${label}`}>
+      {Array.from({ length: 5 }, (_, i) => (
+        <i key={i} className={i < lit ? "on" : ""} />
+      ))}
+      <span className="tag">{label} flow</span>
+    </span>
+  );
+}
 
-        {st && st.dH != null && st.exWin && st.inWin && h && (
-          <StackCard st={st} dT={Math.max(0, (maxIndoor(doc.rooms) || 0) - h.temp)} />
-        )}
+function FanCard({ n, f, use }: { n: number; f: FanSpot; use: boolean }) {
+  return (
+    <div className={"rec fan-card" + (use ? "" : " fan-card--extra")}>
+      <div className="rec__ttl">
+        <span>
+          {use ? `Fan ${n}` : "＋ extra"} · {f.label}
+        </span>
+        <span className="benefit" title={`Usefulness right now: ${Math.round(f.benefit * 100)}%`}>
+          <i style={{ width: `${Math.max(8, Math.round(f.benefit * 100))}%` }} />
+        </span>
       </div>
-    );
-  }
-
-  function StackCard({ st, dT }: { st: NonNullable<FanPlan["stack"]>; dT: number }) {
-    const drive = (st.dH || 0) * dT;
-    const strength = drive > 9 ? "strong" : drive > 3.5 ? "moderate" : "gentle";
-    const aIn = openArea(st.inWin!),
-      aOut = openArea(st.exWin!);
-    const tiltPair =
-      st.inWin!.opening === "tilt" || st.exWin!.opening === "tilt";
-    return (
-      <div className="rec rec--physics">
-        <div className="rec__ttl">
-          <span>🌡️ Stack effect</span>
-          <span className="muted">{strength}</span>
-        </div>
-        <div>
-          Intake low at <b>{st.inSill!.toFixed(1)} m</b>, exhaust high at <b>{st.exTop!.toFixed(1)} m</b> → height gap{" "}
-          <b>Δh {st.dH!.toFixed(1)} m</b>, with <b>ΔT {dT.toFixed(1)}°</b> inside-vs-out.
-        </div>
-        <div className="muted mt">
-          Warm air rises and escapes high while cool air is pulled in low. The bigger Δh and ΔT, the stronger this free
-          chimney draft — so raise the exhaust and lower the intake as far as the windows allow.
-        </div>
-        <div className="mt">
-          💨{" "}
-          {aIn >= aOut ? (
-            <>
-              For a <b>faster, cooler-feeling breeze</b>, open the exhaust fully and the intake ~⅓. By continuity
-              (Bernoulli), a narrower inlet speeds up the incoming jet and throws it deeper into the room. Open both wide
-              instead to flush heat fastest.
-            </>
-          ) : (
-            <>
-              Your intake is already smaller than the exhaust → the incoming air accelerates into a fast jet (Bernoulli).
-              Widen the intake if you'd rather maximise total air exchange than breeze speed.
-            </>
-          )}
-        </div>
-        {tiltPair && (
-          <div className="caveat mt">
-            🪟 One of this pair is only <b>tilted (kipp)</b> — its opening is a fraction of a full sash, throttling the whole
-            chimney. Swing it fully open for a much stronger draft.
-          </div>
-        )}
-        <div className="muted mt">
-          📍 <b>Where to stand a fan:</b> it blows a focused jet but draws air diffusely.{" "}
-          {doc.canSealFan ? (
-            <>
-              Seal <b>window</b> fans into the opening (an intake's back must face outside; seal an exhaust).
-            </>
-          ) : (
-            <>
-              You said your fans can't be sealed in, so stand <b>window</b> fans just inside the opening and stuff a towel
-              into the gaps for a better seal.
-            </>
-          )}{" "}
-          Stand <b>doorway</b> fans ~½ m back on the upstream side and aim through the gap — the jet entrains extra air and
-          amplifies the flow.
-        </div>
+      <div className="fanmeta">
+        <span className="chip chip--kind">{KIND_CHIP[f.kind]}</span>
+        <span className="chip">↕ {f.heightM.toFixed(1)} m</span>
+        <span className="muted">{f.place}</span>
       </div>
-    );
-  }
-
-  function FanCards({ plan, owned }: { plan: FanPlan; owned: number }) {
-    const use = plan.spots.slice(0, owned),
-      extra = plan.spots.slice(owned);
-    return (
-      <>
-        <p className="hint">
-          Place your <b>{owned}</b> portable fan{owned > 1 ? "s" : ""} here (numbered ghosts on the map, best first):
-        </p>
-        <p className="hint">
-          These are starting points from the airflow model, not exact spots — nudge each fan to where the draught actually
-          feels strongest.
-        </p>
-        {use.map((f, i) => (
-          <FanCard key={i} idx={i} label={f.label} heightName={f.heightName} why={f.why} use />
-        ))}
-        {extra.length > 0 ? (
-          <>
-            <p className="hint mt">If you get more fans, next best spots:</p>
-            {extra.map((f, i) => (
-              <FanCard key={i} idx={i} label={f.label} heightName={f.heightName} why={f.why} use={false} />
-            ))}
-          </>
-        ) : (
-          plan.spots.length < owned && (
-            <p className="hint">
-              That's all the fans this layout needs right now — {plan.spots.length} spot
-              {plan.spots.length > 1 ? "s" : ""}. Spare fans won't add much.
-            </p>
-          )
-        )}
-      </>
-    );
-  }
-
-  function FanCard({
-    idx,
-    label,
-    heightName,
-    why,
-    use,
-  }: {
-    idx: number;
-    label: string;
-    heightName: string;
-    why: string;
-    use: boolean;
-  }) {
-    return (
-      <div className="rec" style={use ? undefined : { opacity: 0.6 }}>
-        <div className="rec__ttl">
-          <span>
-            {use ? `▶ Fan ${idx + 1}` : "+ Extra"} · {label}
-          </span>
-        </div>
-        <div>
-          📐 <b>Height:</b> {heightName}
-        </div>
-        <div className="muted mt">{why}</div>
-      </div>
-    );
-  }
+      <div className="muted">{f.why}</div>
+    </div>
+  );
 }
