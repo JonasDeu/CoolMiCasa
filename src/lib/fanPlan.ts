@@ -1,4 +1,4 @@
-import type { Doc, Door, FanSize, Pt, Room, Weather, WindowItem } from "../types";
+import type { Doc, Door, Fan, FanSize, Pt, Room, Weather, WindowItem } from "../types";
 import type { AirflowResult } from "./airflow";
 import {
   angDiff,
@@ -30,6 +30,8 @@ export interface FanSpot {
   why: string;
   /** Relative usefulness right now, 0..1 — drives ordering and the strength bar. */
   benefit: number;
+  /** Size of the specific fan assigned here, or undefined for an "extra" (unowned) spot. */
+  fanSize?: FanSize;
 }
 
 export interface StackInfo {
@@ -86,7 +88,26 @@ export function buildFanPlan(doc: Doc, weather: Weather | null, air: AirflowResu
   const h = nowHour(weather);
   if (!h || !weather || doc.rooms.length === 0)
     return { mode: "off", headline: "", until: null, spots: [], stack: null };
-  return air.active ? flushPlan(doc, weather, air) : sealedPlan(doc, weather);
+  const plan = air.active ? flushPlan(doc, weather, air) : sealedPlan(doc, weather);
+  plan.spots = assignFans(plan.spots, doc.fans);
+  return plan;
+}
+
+/**
+ * Match the user's actual fans to the ranked spots — biggest fan to the
+ * highest-value spot (usually the exhaust "pump"), smallest to a personal
+ * breeze — and fold each fan's airflow into that spot's benefit. A small fan
+ * on the exhaust therefore reads weaker than a large one would, nudging the
+ * user to put their strongest fan where moving bulk air matters most. Spots
+ * beyond the number of fans owned stay unassigned and show as "extra".
+ */
+function assignFans(spots: FanSpot[], fans: Fan[]): FanSpot[] {
+  const sizes = fans.map((f) => f.size).sort((a, b) => SIZE_GAIN[b] - SIZE_GAIN[a]);
+  return spots.map((spot, i) => {
+    const size = sizes[i];
+    if (!size) return spot;
+    return { ...spot, fanSize: size, benefit: clamp01(spot.benefit * SIZE_GAIN[size]) };
+  });
 }
 
 // ============================== FLUSH MODE ==========================================
@@ -95,7 +116,6 @@ function flushPlan(doc: Doc, weather: Weather, air: AirflowResult): FanPlan {
   const h = nowHour(weather)!;
   const CH = doc.ceilingH || 2.5;
   const canSeal = !!doc.canSealFan;
-  const size = SIZE_GAIN[doc.fanSize] ?? 1;
   const natural = air.Q;
   const wd = weather.current.windDir;
   const ws = weather.current.windSpd ?? 0;
@@ -159,7 +179,7 @@ function flushPlan(doc: Doc, weather: Weather, air: AirflowResult): FanPlan {
         : "as high as it stands just inside the window, blowing out — towel the gaps",
       label: `${r?.name ?? "room"} — blow OUT the ${compassName(windowFacing(exWin, doc.northDeg))} window`,
       why: "The pump: pushing hot ceiling air out makes every other opening pull cool air in.",
-      benefit: clamp01((1 - 0.7 * natural) * size * (air.limit === "exhaust" ? 1.2 : 1)),
+      benefit: clamp01((1 - 0.7 * natural) * (air.limit === "exhaust" ? 1.2 : 1)),
     });
   }
 
@@ -182,7 +202,7 @@ function flushPlan(doc: Doc, weather: Weather, air: AirflowResult): FanPlan {
         ? "Wind already feeds this window — only add a fan here if the breeze stalls."
         : "Feeds the pump: cool air is dense, so pushing it in low floods the floor first.",
       benefit: clamp01(
-        (1 - 0.8 * natural) * 0.9 * size * (air.limit === "intake" ? 1.25 : 1) * (windward ? 0.45 : 1),
+        (1 - 0.8 * natural) * 0.9 * (air.limit === "intake" ? 1.25 : 1) * (windward ? 0.45 : 1),
       ),
     });
   }

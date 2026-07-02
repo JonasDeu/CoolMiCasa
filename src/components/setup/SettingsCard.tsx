@@ -2,16 +2,22 @@ import { useStore } from "../../store/useStore";
 import type { FanSize, ThermalMass } from "../../types";
 import { Card, Hint } from "../ui";
 
+const FAN_SIZE_LABEL: Record<FanSize, string> = {
+  small: "Small — desk / USB / clip-on (~20–25 cm)",
+  medium: "Medium — table / pedestal (~30–40 cm)",
+  large: "Large — box / floor / high-velocity (45 cm+)",
+};
+
 export function SettingsCard() {
   const comfort = useStore((s) => s.doc.comfort);
   const ceilingH = useStore((s) => s.doc.ceilingH);
-  const fanCount = useStore((s) => s.doc.fanCount);
-  const fanSize = useStore((s) => s.doc.fanSize);
+  const fans = useStore((s) => s.doc.fans);
   const canSealFan = useStore((s) => s.doc.canSealFan);
   const mass = useStore((s) => s.doc.mass);
   const setComfort = useStore((s) => s.setComfort);
   const setCeiling = useStore((s) => s.setCeiling);
-  const setFanCount = useStore((s) => s.setFanCount);
+  const addFan = useStore((s) => s.addFan);
+  const removeFan = useStore((s) => s.removeFan);
   const setFanSize = useStore((s) => s.setFanSize);
   const setCanSealFan = useStore((s) => s.setCanSealFan);
   const setMass = useStore((s) => s.setMass);
@@ -49,25 +55,34 @@ export function SettingsCard() {
       </Hint>
 
       <label>Portable fans you own</label>
-      <input
-        type="number"
-        step={1}
-        min={0}
-        max={8}
-        value={fanCount}
-        onChange={(e) => setFanCount(parseInt(e.target.value) || 0)}
-      />
-      <Hint>The app picks the best spot &amp; height for each one, highest-impact first.</Hint>
-
-      <label>Fan size / power</label>
-      <select value={fanSize} onChange={(e) => setFanSize(e.target.value as FanSize)}>
-        <option value="small">Small — desk / USB / clip-on (~20–25 cm)</option>
-        <option value="medium">Medium — table / pedestal (~30–40 cm)</option>
-        <option value="large">Large — box / floor / high-velocity (45 cm+)</option>
-      </select>
+      {fans.length === 0 && <p className="muted">No fans yet — add one below.</p>}
+      {fans.map((fan, i) => (
+        <div className="row" key={fan.id}>
+          <span className="tag" style={{ flex: "0 0 auto" }}>
+            Fan {i + 1}
+          </span>
+          <select value={fan.size} onChange={(e) => setFanSize(fan.id, e.target.value as FanSize)}>
+            <option value="small">{FAN_SIZE_LABEL.small}</option>
+            <option value="medium">{FAN_SIZE_LABEL.medium}</option>
+            <option value="large">{FAN_SIZE_LABEL.large}</option>
+          </select>
+          <button
+            className="danger"
+            style={{ flex: "0 0 auto" }}
+            onClick={() => removeFan(fan.id)}
+            title="Remove this fan"
+          >
+            ✕
+          </button>
+        </div>
+      ))}
+      <button className="full mt" onClick={() => addFan()} disabled={fans.length >= 8}>
+        ＋ Add a fan
+      </button>
       <Hint>
-        Bigger fans move more air, so the plan leans on them to flush the flat; small ones are aimed at you for a
-        skin-cooling breeze instead.
+        List each fan and its size. The app picks the best spot &amp; height for each one, highest-impact first — and
+        sends your biggest fan to the spot that moves the most air. Bigger fans flush the flat; small ones are aimed at
+        you for a skin-cooling breeze instead.
       </Hint>
 
       <label className="checkbox">

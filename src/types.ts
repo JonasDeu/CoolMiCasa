@@ -68,8 +68,14 @@ export interface Door {
 /** How heavy the building fabric is — sets how long a cool spell must last to matter. */
 export type ThermalMass = "light" | "medium" | "heavy";
 
-/** Rough airflow class of the user's fans — sets how hard the plan leans on them to move air. */
+/** Rough airflow class of a fan — sets how hard the plan leans on it to move air. */
 export type FanSize = "small" | "medium" | "large";
+
+/** One portable fan the user owns, listed individually so each can carry its own size. */
+export interface Fan {
+  id: string;
+  size: FanSize;
+}
 
 /** The full persisted floor-plan + settings document. */
 export interface Doc {
@@ -79,10 +85,8 @@ export interface Doc {
   comfort: number;
   /** Ceiling height, metres (drives the stack effect). */
   ceilingH: number;
-  /** Number of portable fans the user owns. */
-  fanCount: number;
-  /** Rough size/airflow of those fans — a small desk fan vs a big box/high-velocity unit. */
-  fanSize: FanSize;
+  /** The portable fans the user owns, each with its own size/airflow class. */
+  fans: Fan[];
   /** Can the user seal a fan into a window opening? Most cheap fans can't. */
   canSealFan: boolean;
   /** Building thermal mass — light (drywall/timber) reacts fast, heavy (masonry) is sluggish. */

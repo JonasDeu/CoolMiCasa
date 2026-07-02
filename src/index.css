@@ -502,6 +502,141 @@ button.full {
   margin-right: 5px;
 }
 
+/* ---- action checklist ---- */
+/* the goal line every step serves — tinted by mode like the headline banner */
+.plan-goal {
+  font-weight: 600;
+  padding: 9px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  margin-bottom: 10px;
+}
+.plan-goal--flush {
+  background: rgba(55, 211, 154, 0.1);
+  border-color: rgba(55, 211, 154, 0.4);
+}
+.plan-goal--seal {
+  background: rgba(255, 107, 94, 0.1);
+  border-color: rgba(255, 107, 94, 0.4);
+}
+.plan-goal--hold {
+  background: rgba(255, 176, 58, 0.1);
+  border-color: rgba(255, 176, 58, 0.4);
+}
+.steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.step {
+  display: flex;
+  gap: 10px;
+  padding: 10px 11px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+.step__n {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  margin-top: 1px;
+  border-radius: 50%;
+  background: var(--surface-3);
+  border: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--accent);
+}
+.step__body {
+  min-width: 0;
+}
+.step__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.step__why {
+  margin-top: 2px;
+}
+.step__note {
+  margin-top: 3px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.pill--fan {
+  background: rgba(94, 198, 255, 0.16);
+  color: var(--accent);
+}
+/* nothing to change — the positive resting state */
+.allset {
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(55, 211, 154, 0.4);
+  background: rgba(55, 211, 154, 0.08);
+  font-weight: 600;
+}
+.allset__next {
+  display: block;
+  margin-top: 4px;
+  font-weight: 400;
+  color: var(--muted);
+}
+/* doors already in the right position — reassurance, collapsed by default */
+.confirmed {
+  margin-top: 10px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.confirmed summary {
+  cursor: pointer;
+  color: #8fd6b8;
+  font-weight: 600;
+}
+.confirmed ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+.confirmed li {
+  margin: 3px 0;
+}
+
+/* ---- coming up (schedule) ---- */
+.upnext {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.up-row {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+}
+.up-row__time {
+  flex: none;
+  min-width: 56px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: var(--accent);
+}
+.up-row__icon {
+  flex: none;
+}
+.up-row__text {
+  min-width: 0;
+  flex: 1;
+}
+.up-row .tag {
+  white-space: nowrap;
+}
+
 /* ---- recommendation blocks ---- */
 .rec {
   border: 1px solid var(--line);
@@ -750,13 +885,6 @@ button.full {
   color: var(--muted);
   overflow: hidden;
 }
-.timeline-summary {
-  margin-top: 10px;
-}
-.timeline-summary > div {
-  margin: 4px 0;
-}
-
 /* ---- room temperature forecast ---- */
 .forecast-list {
   display: flex;
@@ -780,6 +908,12 @@ button.full {
   font-weight: 700;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+.forecast-row__now {
+  color: var(--muted);
+  font-size: 11.5px;
   white-space: nowrap;
 }
 .forecast-row__stats {

@@ -11,14 +11,22 @@ const KIND_CHIP: Record<FanKind, string> = {
   personal: "AT YOU",
 };
 
+/**
+ * Airflow status + fan capacity. The concrete "put fan X here" steps live in the
+ * checklist above — this panel explains WHY the air moves the way it does (mode,
+ * flow strength, bottleneck, chimney pull, rooms off the breeze) and shows the
+ * spots that would earn a fan the user doesn't own yet.
+ */
 export function FanPlanPanel() {
   const { air, plan, docEff: doc } = useDerived();
   const weather = useStore((s) => s.weather);
 
   if (!weather) return <p className="muted">Set a location to model airflow and fan placement.</p>;
-  if (doc.rooms.length === 0) return <p className="muted">Draw rooms and connect them with the Door tool.</p>;
+  if (doc.rooms.length === 0)
+    return <p className="muted">Draw rooms and connect them with the Door tool to see how air moves.</p>;
 
-  const owned = doc.fanCount || 0;
+  const owned = doc.fans.length;
+  const extras = plan.spots.slice(owned);
   const names = (set: Set<string>) =>
     [...set]
       .map((id) => roomById(doc.rooms, id)?.name)
@@ -52,15 +60,10 @@ export function FanPlanPanel() {
           )}
           {prioUnserved.length > 0 && (
             <div className="caveat">
-              ⭐ Off the breeze: <b>{prioUnserved.map((r) => r.name).join(", ")}</b> — the doorway fans below fix that
-              first.
+              ⭐ Off the breeze: <b>{prioUnserved.map((r) => r.name).join(", ")}</b> — the doorway-fan steps in the
+              checklist fix that first.
             </div>
           )}
-          {air.doorSuggest.slice(0, 2).map((s, i) => (
-            <div className="accent" key={i}>
-              🚪 {s.priority ? "⭐ " : ""}Open the door <b>{s.aName}</b> ↔ <b>{s.bName}</b> to connect the breeze.
-            </div>
-          ))}
           {air.stagnant.size > 0 && <div className="muted">⚠ No fresh air: {names(air.stagnant)}.</div>}
           {air.singleRooms.size > 0 && <div className="muted">~ One-sided only: {names(air.singleRooms)}.</div>}
           {st && st.dH != null && st.dH > 0.2 && (
@@ -79,15 +82,28 @@ export function FanPlanPanel() {
             : "No room is over target — no fan needed right now."}
         </p>
       ) : owned === 0 ? (
-        <p className="muted">Set how many fans you own (Setup) and the spots below get ranked for you.</p>
-      ) : null}
-      {plan.spots.map((f, i) => (
-        <FanCard key={i} n={i + 1} f={f} use={i < owned} />
-      ))}
-      {owned > 0 && plan.spots.length > 0 && plan.spots.length < owned && (
+        <>
+          <p className="muted">
+            Add the fans you own in Settings ⚙ and each gets a step in the checklist. The best positions right now:
+          </p>
+          {plan.spots.map((f, i) => (
+            <SpotCard key={i} n={i + 1} f={f} />
+          ))}
+        </>
+      ) : extras.length > 0 ? (
+        <>
+          <p className="hint">
+            Your {owned} fan{owned > 1 ? "s are" : " is"} placed in the checklist above. Another fan would go here
+            next:
+          </p>
+          {extras.map((f, i) => (
+            <SpotCard key={i} n={owned + i + 1} f={f} dim />
+          ))}
+        </>
+      ) : (
         <p className="hint">
-          Only {plan.spots.length} spot{plan.spots.length > 1 ? "s" : ""} earn a fan right now — spares won't add
-          much.
+          All worthwhile spots are covered by the checklist above
+          {owned > plan.spots.length ? " — spare fans won't add much right now" : ""}.
         </p>
       )}
 
@@ -125,12 +141,12 @@ function FlowMeter({ q }: { q: number }) {
   );
 }
 
-function FanCard({ n, f, use }: { n: number; f: FanSpot; use: boolean }) {
+function SpotCard({ n, f, dim }: { n: number; f: FanSpot; dim?: boolean }) {
   return (
-    <div className={"rec fan-card" + (use ? "" : " fan-card--extra")}>
+    <div className={"rec fan-card" + (dim ? " fan-card--extra" : "")}>
       <div className="rec__ttl">
         <span>
-          {use ? `Fan ${n}` : "＋ extra"} · {f.label}
+          Spot {n} · {f.label}
         </span>
         <span className="benefit" title={`Usefulness right now: ${Math.round(f.benefit * 100)}%`}>
           <i style={{ width: `${Math.max(8, Math.round(f.benefit * 100))}%` }} />

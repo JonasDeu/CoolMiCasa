@@ -41,8 +41,9 @@ export function HelpDialog({ open, onClose }: Props) {
           when you should flip it (double-click the door).
         </li>
         <li>
-          <b>Say how many fans you have</b> — the app ranks the best spots and heights: exhaust high where hot air pools
-          (stack effect), intake low for cool night air, and a doorway booster where air accelerates (Bernoulli).
+          <b>List the fans you have and their sizes</b> — the app ranks the best spots and heights: exhaust high where
+          hot air pools (stack effect), intake low for cool night air, and a doorway booster where air accelerates
+          (Bernoulli). Your biggest fan is sent to the spot that moves the most air.
         </li>
         <li>
           <b>Rotate North</b> so the compass matches reality. The app computes exactly which windows the sun hits, hour
@@ -52,8 +53,9 @@ export function HelpDialog({ open, onClose }: Props) {
           <b>Type the temperature</b> you measure in each room (and optionally right at a window).
         </li>
         <li>
-          Read the headline banner and <b>Next 24h</b> timeline. Green = open &amp; ventilate, orange = keep closed,
-          yellow = sun on glass so close the shade.
+          <b>Work through the checklist</b> — the Advice column turns all of this into numbered steps (shade, open,
+          close, flip doors, place fans), highest impact first, and <b>Coming up</b> tells you when the plan changes
+          next. In the timeline: green = open &amp; ventilate, orange = keep closed, yellow = sun on glass.
         </li>
       </ol>
       <p className="hint">

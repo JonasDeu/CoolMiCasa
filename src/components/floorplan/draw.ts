@@ -289,7 +289,7 @@ export function drawScene(ctx: CanvasRenderingContext2D, o: DrawOpts) {
   drawAirflow(ctx, air, now);
   drawWindowFlows(ctx, doc, air);
   drawDoors(ctx, doc, air, openings, selection, now);
-  drawFans(ctx, fanSpots, doc.fanCount || 0, now);
+  drawFans(ctx, fanSpots, doc.fans.length, now);
 
   ctx.restore();
 

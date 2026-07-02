@@ -2,6 +2,7 @@ import { useStore } from "../../store/useStore";
 import { useDerived } from "../../state/derived";
 import { fmt } from "../../lib/recommend";
 import type { ForecastPoint, RoomForecast } from "../../lib/forecast";
+import type { Room } from "../../types";
 
 const W = 220;
 const H = 40;
@@ -58,7 +59,7 @@ export function RoomForecast() {
       )}
       <div className="forecast-list">
         {rooms.map((r) => (
-          <ForecastRow key={r.id} f={forecast[r.id]} name={r.name} lo={lo} hi={hi} />
+          <ForecastRow key={r.id} f={forecast[r.id]} room={r} lo={lo} hi={hi} />
         ))}
       </div>
       <div className="legend">
@@ -86,15 +87,17 @@ function roomName(doc: ReturnType<typeof useDerived>["docEff"], id: string): str
 
 function ForecastRow({
   f,
-  name,
+  room,
   lo,
   hi,
 }: {
   f: RoomForecast;
-  name: string;
+  room: Room;
   lo: number;
   hi: number;
 }) {
+  const name = room.name;
+  const rh = room.rh != null && Number.isFinite(+room.rh) ? Math.round(+room.rh) : null;
   const n = f.points.length;
   const x = (i: number) => (n > 1 ? (i / (n - 1)) * W : W / 2);
   const y = (t: number) => H - 4 - ((t - lo) / (hi - lo)) * (H - 8);
@@ -109,6 +112,11 @@ function ForecastRow({
         <span className="forecast-row__name">
           {f.estimated && "~"}
           {name}
+        </span>
+        <span className="forecast-row__now">
+          {f.estimated && "~"}
+          {fmt(+room.temp)}° now
+          {rh != null && ` · 💧${rh}%`}
         </span>
         <span className="forecast-row__stats">
           <span className="warm">▲ {fmt(f.peak.temp)}° {f.peak.hour}h</span>

@@ -1,5 +1,5 @@
 import type { Doc, Hour, Room, SunPos, Weather, WindowItem } from "../types";
-import { angDiff, compassName, roomById, windowFacing } from "./geometry";
+import { angDiff, roomById, windowFacing } from "./geometry";
 import { dewPointC, DEW_MARGIN, MUGGY_DEW, muggyLevel } from "./humidity";
 
 export function nowHour(weather: Weather | null): Hour | null {
@@ -174,28 +174,6 @@ export function openWindowsNow(doc: Doc, weather: Weather | null): WindowItem[] 
     const sunHit = sunOnWindow(w, h.sun, doc.northDeg) && h.rad > 120;
     return !sunHit && ventilate(outT, indoorT, target);
   });
-}
-
-export function hasCrossVentilation(windows: WindowItem[], northDeg: number): boolean {
-  const facings = windows.map((w) => windowFacing(w, northDeg));
-  for (let i = 0; i < facings.length; i++)
-    for (let j = i + 1; j < facings.length; j++)
-      if (angDiff(facings[i], facings[j]) > 120) return true;
-  return false;
-}
-
-export function leewardSideName(windows: WindowItem[], weather: Weather, northDeg: number): string | null {
-  const wd = weather.current.windDir;
-  let best: WindowItem | null = null,
-    bd = -1;
-  for (const w of windows) {
-    const d = angDiff(windowFacing(w, northDeg), wd);
-    if (d > bd) {
-      bd = d;
-      best = w;
-    }
-  }
-  return best ? compassName(windowFacing(best, northDeg)) : null;
 }
 
 export function fmt(v: number | null | undefined): number | string {

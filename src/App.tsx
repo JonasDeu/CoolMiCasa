@@ -6,6 +6,7 @@ import { Header } from "./components/Header";
 import { HelpDialog } from "./components/HelpDialog";
 import { NowBanner } from "./components/advice/NowBanner";
 import { ActionList } from "./components/advice/ActionList";
+import { UpNext } from "./components/advice/UpNext";
 import { FanPlanPanel } from "./components/advice/FanPlanPanel";
 import { RoomForecast } from "./components/advice/RoomForecast";
 import { Timeline } from "./components/advice/Timeline";
@@ -77,12 +78,16 @@ export function App() {
             <Legend />
           </main>
 
-          {/* ADVICE */}
+          {/* ADVICE — the story reads top-to-bottom: do this now → come back at these
+              times → why the air moves this way → how warm it gets, room by room */}
           <aside className="col col--advice">
             <Card title="Do this now">
               <ActionList />
             </Card>
-            <Card title="Airflow & fan plan">
+            <Card title="Coming up">
+              <UpNext />
+            </Card>
+            <Card title="Airflow & fans">
               <FanPlanPanel />
             </Card>
             <Card title="Room temperature outlook">

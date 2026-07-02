@@ -4,7 +4,7 @@ import type { Doc, FanSize, LatLon, Pt, Selection, ThermalMass, Tool, Weather } 
 import { uid } from "../lib/id";
 import { nearestRoom, roomById, snapDoorPos, snapWindow, twoNearestRooms } from "../lib/geometry";
 import { TEMPLATES, templateById } from "../lib/templates";
-import { defaultDoc, markLoadedRoomsMeasured } from "../lib/doc";
+import { defaultDoc, markLoadedRoomsMeasured, migrateFans } from "../lib/doc";
 
 const SKEY = "coolmicasa.v2";
 const SKEY_V1 = "coolmicasa.v1";
@@ -23,15 +23,17 @@ function loadDoc(): Doc {
     const raw = localStorage.getItem(SKEY);
     if (raw) {
       const s = JSON.parse(raw);
-      if (s && s.rooms) return markLoadedRoomsMeasured({ ...defaultDoc(), ...s });
+      if (s && s.rooms) {
+        migrateFans(s);
+        return markLoadedRoomsMeasured({ ...defaultDoc(), ...s });
+      }
     }
     const rawV1 = localStorage.getItem(SKEY_V1);
     if (rawV1) {
       const s = JSON.parse(rawV1);
       if (s && s.rooms) {
-        const d: Doc = { ...defaultDoc(), ...s };
-        delete (d as Doc & { fans?: unknown }).fans;
-        return markLoadedRoomsMeasured(d);
+        migrateFans(s);
+        return markLoadedRoomsMeasured({ ...defaultDoc(), ...s });
       }
     }
   } catch {
@@ -75,8 +77,9 @@ export interface AppState {
   // ---- settings ----
   setComfort: (v: number) => void;
   setCeiling: (v: number) => void;
-  setFanCount: (v: number) => void;
-  setFanSize: (v: FanSize) => void;
+  addFan: (size?: FanSize) => void;
+  removeFan: (id: string) => void;
+  setFanSize: (id: string, size: FanSize) => void;
   setNorth: (v: number) => void;
   setCanSealFan: (v: boolean) => void;
   setMass: (v: ThermalMass) => void;
@@ -138,14 +141,21 @@ export const useStore = create<AppState>()(
         s.doc.ceilingH = v;
         persist(s.doc);
       }),
-    setFanCount: (v) =>
+    addFan: (size = "medium") =>
       set((s) => {
-        s.doc.fanCount = Math.max(0, Math.min(8, v));
+        if (s.doc.fans.length >= 8) return;
+        s.doc.fans.push({ id: uid(), size });
         persist(s.doc);
       }),
-    setFanSize: (v) =>
+    removeFan: (id) =>
       set((s) => {
-        s.doc.fanSize = v;
+        s.doc.fans = s.doc.fans.filter((f) => f.id !== id);
+        persist(s.doc);
+      }),
+    setFanSize: (id, size) =>
+      set((s) => {
+        const f = s.doc.fans.find((x) => x.id === id);
+        if (f) f.size = size;
         persist(s.doc);
       }),
     setNorth: (v) =>

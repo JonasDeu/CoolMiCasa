@@ -1,5 +1,5 @@
 import type { Doc } from "../types";
-import { defaultDoc, markLoadedRoomsMeasured } from "./doc";
+import { defaultDoc, markLoadedRoomsMeasured, migrateFans } from "./doc";
 
 /** Marker so we can recognise our own files and reject unrelated JSON. */
 export const LAYOUT_FORMAT = "coolmicasa.layout";
@@ -48,6 +48,7 @@ export function parseLayoutFile(text: string): ParseResult {
   if (!raw || typeof raw !== "object" || !isArr((raw as { rooms?: unknown }).rooms)) {
     return { ok: false, error: "That file doesn't look like a CoolMiCasa layout — no rooms found." };
   }
+  migrateFans(raw as Record<string, unknown>);
   const r = raw as Partial<Doc>;
   const doc = markLoadedRoomsMeasured({
     ...defaultDoc(),
