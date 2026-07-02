@@ -45,7 +45,7 @@ export function ActionList() {
         <li>
           Open windows wide and{" "}
           {hasCrossVentilation(doc.windows, doc.northDeg)
-            ? "open the doors between rooms (incl. the hallway) for a cross-breeze"
+            ? "open the doors between rooms for a cross-breeze"
             : "open internal doors to let air move through"}
           .
         </li>
@@ -108,7 +108,7 @@ export function ActionList() {
         return (
           <div className={`rec${est ? " rec--est" : ""}`} key={r.id}>
             <div className="rec__ttl">
-              <span>{r.name}</span>
+              <span>{r.priority ? "⭐ " : ""}{r.name}</span>
               <span className="muted">
                 {est && "~"}
                 {isFinite(indoorT) ? fmt(indoorT) + "°" : "—"}
@@ -119,6 +119,12 @@ export function ActionList() {
                   </span>
                 )}{" "}
                 <span className="tag">/ {fmt(target)}° target</span> {warm ? "🔥" : "✅"}
+                {r.rh != null && Number.isFinite(+r.rh) && (
+                  <span className="tag">
+                    {" · "}💧 {Math.round(+r.rh)}%
+                    {r.rhTarget != null && ` / ${Math.round(+r.rhTarget)}% ${+r.rh > +r.rhTarget ? "💧" : "✅"}`}
+                  </span>
+                )}
               </span>
             </div>
             {muggy && <div className="caveat">{muggy}</div>}
@@ -138,7 +144,8 @@ export function ActionList() {
                 }
                 if (ventilate(outT, indoorT, target)) {
                   const role = windRole(windowFacing(w, doc.northDeg), wd, ws);
-                  const wp = planVent(outT, outRh, indoorT, r.rh ?? null, target, precip, precipProb);
+                  const outRhW = w.rh != null ? +w.rh : outRh;
+                  const wp = planVent(outT, outRhW, indoorT, r.rh ?? null, target, precip, precipProb);
                   const humid = wp.importsMoisture
                     ? " · 💧 cooler but humid"
                     : wp.muggyOutside
@@ -153,6 +160,9 @@ export function ActionList() {
                           ? " (good spot for a fan blowing out)"
                           : ""}
                       {humid}.
+                      {w.opening === "tilt" && (
+                        <span className="tag"> · only tilted (kipp) → limited airflow; swing it fully open to flush faster.</span>
+                      )}
                     </li>
                   );
                 }

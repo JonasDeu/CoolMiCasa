@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { Door, Pt, Room, WindowItem } from "../../types";
-import { roomById, windowMid } from "../../lib/geometry";
+import { cmToLen, roomById, windowMid, winWidthCm } from "../../lib/geometry";
 import { useStore } from "../../store/useStore";
 import { useDerived } from "../../state/derived";
 import { drawScene } from "./draw";
@@ -408,6 +408,33 @@ export function FloorPlanCanvas() {
               onKeyDown={closeOnKey}
             />
             <span>°C</span>
+          </div>
+          <div className="temp-edit__row">
+            <label>Width</label>
+            <input
+              type="number"
+              step={5}
+              min={20}
+              max={400}
+              value={winWidthCm(editWin)}
+              onChange={(e) => {
+                const cm = parseFloat(e.target.value);
+                if (Number.isFinite(cm)) updateWindow(editWin.id, { len: cmToLen(Math.max(20, Math.min(400, cm))) });
+              }}
+              onKeyDown={closeOnKey}
+            />
+            <span>cm</span>
+          </div>
+          <div className="temp-edit__row">
+            <label>Opening</label>
+            <select
+              value={editWin.opening === "tilt" ? "tilt" : "full"}
+              onChange={(e) => updateWindow(editWin.id, { opening: e.target.value === "tilt" ? "tilt" : "full" })}
+              onKeyDown={closeOnKey}
+            >
+              <option value="full">Full</option>
+              <option value="tilt">Kipp</option>
+            </select>
           </div>
         </div>
       )}

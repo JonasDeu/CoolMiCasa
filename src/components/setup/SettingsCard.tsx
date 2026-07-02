@@ -1,16 +1,18 @@
 import { useStore } from "../../store/useStore";
-import type { ThermalMass } from "../../types";
+import type { FanSize, ThermalMass } from "../../types";
 import { Card, Hint } from "../ui";
 
 export function SettingsCard() {
   const comfort = useStore((s) => s.doc.comfort);
   const ceilingH = useStore((s) => s.doc.ceilingH);
   const fanCount = useStore((s) => s.doc.fanCount);
+  const fanSize = useStore((s) => s.doc.fanSize);
   const canSealFan = useStore((s) => s.doc.canSealFan);
   const mass = useStore((s) => s.doc.mass);
   const setComfort = useStore((s) => s.setComfort);
   const setCeiling = useStore((s) => s.setCeiling);
   const setFanCount = useStore((s) => s.setFanCount);
+  const setFanSize = useStore((s) => s.setFanSize);
   const setCanSealFan = useStore((s) => s.setCanSealFan);
   const setMass = useStore((s) => s.setMass);
 
@@ -56,6 +58,17 @@ export function SettingsCard() {
         onChange={(e) => setFanCount(parseInt(e.target.value) || 0)}
       />
       <Hint>The app picks the best spot &amp; height for each one, highest-impact first.</Hint>
+
+      <label>Fan size / power</label>
+      <select value={fanSize} onChange={(e) => setFanSize(e.target.value as FanSize)}>
+        <option value="small">Small — desk / USB / clip-on (~20–25 cm)</option>
+        <option value="medium">Medium — table / pedestal (~30–40 cm)</option>
+        <option value="large">Large — box / floor / high-velocity (45 cm+)</option>
+      </select>
+      <Hint>
+        Bigger fans move more air, so the plan leans on them to flush the flat; small ones are aimed at you for a
+        skin-cooling breeze instead.
+      </Hint>
 
       <label className="checkbox">
         <input type="checkbox" checked={canSealFan} onChange={(e) => setCanSealFan(e.target.checked)} /> I can seal a fan

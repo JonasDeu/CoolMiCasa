@@ -23,6 +23,10 @@ export interface Room {
   rh?: number | null;
   /** Per-room comfort target, °C. Null/undefined falls back to the document default. */
   target?: number | null;
+  /** Per-room humidity ceiling, % RH. Null/undefined = no target (humidity has no document default). */
+  rhTarget?: number | null;
+  /** "Cool this one first" — biases airflow routing and fan placement toward this room. */
+  priority?: boolean;
 }
 
 /** A window opening on one wall of a room. Named WindowItem to avoid the DOM `Window`. */
@@ -38,10 +42,18 @@ export interface WindowItem {
   shade: boolean;
   /** Outdoor temp measured directly in front of this window, or null to use the area forecast. */
   temp: number | null;
+  /** Outdoor relative humidity in front of this window, %, or null to use the area forecast. */
+  rh?: number | null;
   /** Sill height above floor, metres. */
   sill?: number | null;
   /** Glass height, metres. */
   winH?: number | null;
+  /**
+   * How the window opens: "full" swings/slides wide open; "tilt" is the German
+   * *gekippt* mode where only the top edge tilts inward, letting a fraction of the
+   * airflow through. Null/undefined = "full" (keeps old saved windows working).
+   */
+  opening?: "full" | "tilt" | null;
 }
 
 export interface Door {
@@ -56,6 +68,9 @@ export interface Door {
 /** How heavy the building fabric is — sets how long a cool spell must last to matter. */
 export type ThermalMass = "light" | "medium" | "heavy";
 
+/** Rough airflow class of the user's fans — sets how hard the plan leans on them to move air. */
+export type FanSize = "small" | "medium" | "large";
+
 /** The full persisted floor-plan + settings document. */
 export interface Doc {
   location: LatLon | null;
@@ -66,6 +81,8 @@ export interface Doc {
   ceilingH: number;
   /** Number of portable fans the user owns. */
   fanCount: number;
+  /** Rough size/airflow of those fans — a small desk fan vs a big box/high-velocity unit. */
+  fanSize: FanSize;
   /** Can the user seal a fan into a window opening? Most cheap fans can't. */
   canSealFan: boolean;
   /** Building thermal mass — light (drywall/timber) reacts fast, heavy (masonry) is sluggish. */

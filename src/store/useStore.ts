@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
-import type { Doc, LatLon, Pt, Selection, ThermalMass, Tool, Weather } from "../types";
+import type { Doc, FanSize, LatLon, Pt, Selection, ThermalMass, Tool, Weather } from "../types";
 import { uid } from "../lib/id";
 import { nearestRoom, roomById, snapDoorPos, snapWindow, twoNearestRooms } from "../lib/geometry";
 import { TEMPLATES, templateById } from "../lib/templates";
@@ -76,6 +76,7 @@ export interface AppState {
   setComfort: (v: number) => void;
   setCeiling: (v: number) => void;
   setFanCount: (v: number) => void;
+  setFanSize: (v: FanSize) => void;
   setNorth: (v: number) => void;
   setCanSealFan: (v: boolean) => void;
   setMass: (v: ThermalMass) => void;
@@ -140,6 +141,11 @@ export const useStore = create<AppState>()(
     setFanCount: (v) =>
       set((s) => {
         s.doc.fanCount = Math.max(0, Math.min(8, v));
+        persist(s.doc);
+      }),
+    setFanSize: (v) =>
+      set((s) => {
+        s.doc.fanSize = v;
         persist(s.doc);
       }),
     setNorth: (v) =>
@@ -236,7 +242,7 @@ export const useStore = create<AppState>()(
       const id = uid();
       set((s) => {
         const room = roomById(s.doc.rooms, r.id)!;
-        const w = { id, roomId: room.id, side: "N" as const, pos: 0.5, len: 80, shade: true, temp: null };
+        const w = { id, roomId: room.id, side: "N" as const, pos: 0.5, len: 80, shade: true, temp: null, rh: null };
         snapWindow(w, room, p);
         s.doc.windows.push(w);
         s.selection = { type: "window", id };

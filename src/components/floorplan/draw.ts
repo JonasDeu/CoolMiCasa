@@ -12,6 +12,7 @@ import {
   windowSegment,
 } from "../../lib/geometry";
 import { maxIndoor, nowHour, roomTarget, sunOnWindow, ventilate } from "../../lib/recommend";
+import { dewPointC, MUGGY_DEW } from "../../lib/humidity";
 import type { RoomTempMap } from "../../lib/temps";
 
 const COLORS = {
@@ -85,6 +86,14 @@ export function drawScene(ctx: CanvasRenderingContext2D, o: DrawOpts) {
     ctx.lineWidth = seld ? 3 : 2;
     ctx.fillRect(r.x, r.y, r.w, r.h);
     ctx.strokeRect(r.x, r.y, r.w, r.h);
+    if (r.priority) {
+      ctx.save();
+      ctx.strokeStyle = COLORS.sun;
+      ctx.lineWidth = 2;
+      ctx.setLineDash([5, 4]);
+      ctx.strokeRect(r.x + 3, r.y + 3, r.w - 6, r.h - 6);
+      ctx.restore();
+    }
     if (air && air.active) {
       if (air.flowRooms.has(r.id)) {
         ctx.fillStyle = "rgba(94,198,255,.12)";
@@ -96,7 +105,7 @@ export function drawScene(ctx: CanvasRenderingContext2D, o: DrawOpts) {
     }
     ctx.fillStyle = COLORS.textBright;
     ctx.font = "600 13px system-ui";
-    ctx.fillText(r.name, r.x + 8, r.y + 18);
+    ctx.fillText((r.priority ? "⭐ " : "") + r.name, r.x + 8, r.y + 18);
 
     // dimensions in metres (top-right of the room)
     if (r.w > 70) {
@@ -127,6 +136,38 @@ export function drawScene(ctx: CanvasRenderingContext2D, o: DrawOpts) {
       ctx.fillStyle = custom ? "#bcd0e6" : COLORS.textMuted;
       ctx.font = (custom ? "700 " : "600 ") + "11px system-ui";
       ctx.fillText(`🎯 ${target}°`, r.x + 8, r.y + 55);
+    }
+
+    // humidity: a measured hygrometer reading, or (softly) a borrowed estimate, plus
+    // an optional per-room ceiling. Estimates get the same ~/est. treatment as temps.
+    if (r.rh != null && Number.isFinite(+r.rh) && r.h > 84) {
+      const rh = +r.rh;
+      const rhEst = temps[r.id]?.rhEstimated;
+      const rhTarget = r.rhTarget != null ? +r.rhTarget : null;
+      ctx.fillStyle = rhEst
+        ? COLORS.textMuted
+        : rhTarget != null
+          ? rh > rhTarget
+            ? "#ff9d8f"
+            : "#7fe0bd"
+          : dewPointC(t, rh) >= MUGGY_DEW
+            ? COLORS.warn
+            : COLORS.textMuted;
+      ctx.font = "700 12px system-ui";
+      const rhLabel = `${rhEst ? "~" : ""}💧 ${Math.round(rh)}%`;
+      ctx.fillText(rhLabel, r.x + 8, r.y + 72);
+      let after = r.x + 8 + ctx.measureText(rhLabel).width + 6;
+      if (rhEst) {
+        ctx.fillStyle = COLORS.textMuted;
+        ctx.font = "italic 10px system-ui";
+        ctx.fillText("est.", after, r.y + 71);
+        after += ctx.measureText("est.").width + 6;
+      }
+      if (rhTarget != null) {
+        ctx.fillStyle = COLORS.textMuted;
+        ctx.font = "600 11px system-ui";
+        ctx.fillText(`🎯 ${Math.round(rhTarget)}%`, after, r.y + 71);
+      }
     }
 
     if (air && air.active) {
@@ -164,13 +205,17 @@ export function drawScene(ctx: CanvasRenderingContext2D, o: DrawOpts) {
       else if (ventilate(outdoorT, indoorT, target)) color = COLORS.good;
       else color = COLORS.warn;
     }
+    // tilt-only (gekippt) windows draw dashed to signal they only crack open a little
+    const tilt = w.opening === "tilt";
     ctx.strokeStyle = color;
-    ctx.lineWidth = 7;
+    ctx.lineWidth = tilt ? 5 : 7;
     ctx.lineCap = "round";
+    if (tilt) ctx.setLineDash([5, 4]);
     ctx.beginPath();
     ctx.moveTo(seg.x1, seg.y1);
     ctx.lineTo(seg.x2, seg.y2);
     ctx.stroke();
+    ctx.setLineDash([]);
     if (selection?.type === "window" && selection.id === w.id) {
       ctx.strokeStyle = "#fff";
       ctx.lineWidth = 2;
@@ -180,9 +225,15 @@ export function drawScene(ctx: CanvasRenderingContext2D, o: DrawOpts) {
       ctx.stroke();
     }
     const m = windowMid(w, doc.rooms)!;
+    const facing = compassName(windowFacing(w, doc.northDeg));
     ctx.fillStyle = COLORS.textMuted;
     ctx.font = "10px system-ui";
-    ctx.fillText(compassName(windowFacing(w, doc.northDeg)), m.x - 6, m.y - 9);
+    ctx.fillText(facing, m.x - 6, m.y - 9);
+    if (tilt) {
+      ctx.fillStyle = COLORS.sun;
+      ctx.font = "700 9px system-ui";
+      ctx.fillText("kipp", m.x - 6 + ctx.measureText(facing).width + 4, m.y - 9);
+    }
 
     // outdoor temp (double-click the window to set it); muted dash when unset
     const v = outwardVec(w.side);
@@ -308,6 +359,10 @@ function drawDoors(
         }
         if (onPath) break;
       }
+    // In a net of rooms the breeze isn't limited to one drawn path — any open door
+    // linking two cross-flow rooms carries part of it, so highlight those too.
+    if (!onPath && air && air.active && d.open && air.flowRooms.has(d.roomA) && air.flowRooms.has(d.roomB))
+      onPath = true;
     const vert = doorWallVertical(d, doc.rooms),
       half = 15;
     let x1, y1, x2, y2;

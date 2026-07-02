@@ -688,6 +688,51 @@ button.full {
   margin: 4px 0;
 }
 
+/* ---- room temperature forecast ---- */
+.forecast-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
+}
+.forecast-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.forecast-row__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 12.5px;
+}
+.forecast-row__name {
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.forecast-row__stats {
+  color: var(--muted);
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+.forecast-row__stats .warm {
+  color: #ff9d8f;
+}
+.forecast-row__stats .cool {
+  color: #7fe0bd;
+}
+.forecast-spark {
+  width: 100%;
+  height: 40px;
+  display: block;
+  border-radius: 6px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+}
+
 /* ---- tabbar (mobile) ---- */
 .tabbar {
   position: fixed;

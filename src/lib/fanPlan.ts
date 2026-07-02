@@ -1,9 +1,10 @@
-import type { Doc, Pt, Weather, WindowItem } from "../types";
+import type { Doc, FanSize, Pt, Weather, WindowItem } from "../types";
 import type { AirflowResult } from "./airflow";
 import {
   angDiff,
   compassName,
   doorBetween,
+  openingFactor,
   outwardVec,
   roomById,
   roomCenter,
@@ -39,6 +40,26 @@ export interface FanPlan {
 }
 
 /**
+ * Size-aware guidance: how hard to lean on the user's fans given their airflow class.
+ * `active` = we're in window-ventilation mode (drawing in cooler outside air) vs sealed comfort.
+ */
+export function fanSizeNote(size: FanSize, active: boolean): string {
+  if (size === "small") {
+    return active
+      ? "🪫 Small fans move little air, so don't count on them to flush the flat — use them to boost a doorway or aim one straight at your body. A breeze on skin feels ~3° cooler even when the room barely stirs."
+      : "🪫 Small fans move little air — point them straight at where you sit or sleep. With the windows shut, that skin-cooling breeze is what actually helps.";
+  }
+  if (size === "large") {
+    return active
+      ? "💪 Large fans (box / high-velocity) shift the most air — make your biggest the window exhaust engine to drive the stack effect hardest. A big fan also throws a jet several metres, so it boosts doorways well."
+      : "💪 A large fan can stir a whole room — with the windows shut keep it circulating indoor air (don't import outside heat), angled across the space or through a doorway.";
+  }
+  return active
+    ? "🌀 Medium fans handle the window exhaust and doorway boosts fine. If your fans differ, put the biggest on the exhaust and smaller ones on personal cooling."
+    : "🌀 Aim your medium fans across the room or through a doorway to keep indoor air moving while the flat is sealed.";
+}
+
+/**
  * Exact position + height recommendations for portable fans.
  * heightM is metres above floor; `why` explains the physics.
  */
@@ -63,7 +84,8 @@ export function buildFanPlan(doc: Doc, weather: Weather | null, air: AirflowResu
       const lee = air.calm ? 0 : angDiff(windowFacing(w, doc.northDeg), wd);
       const r = roomById(rooms, w.roomId);
       const over = r ? Math.max(0, (+r.temp || 0) - roomTarget(doc, r)) : 0;
-      const score = lee * 0.5 + winTop(w, CH) * 40 + (+(r?.temp ?? 0) || 0) + over * 3;
+      // a tilt-only (kipp) window makes a poor exhaust engine — prefer one that opens fully
+      const score = lee * 0.5 + winTop(w, CH) * 40 + (+(r?.temp ?? 0) || 0) + over * 3 + openingFactor(w) * 25;
       if (score > exScore) {
         exScore = score;
         exWin = w;
@@ -71,7 +93,8 @@ export function buildFanPlan(doc: Doc, weather: Weather | null, air: AirflowResu
     });
     if (!exWin) {
       air.openWins.forEach((w) => {
-        const s = (air.calm ? 0 : angDiff(windowFacing(w, doc.northDeg), wd)) * 0.5 + winTop(w, CH) * 40;
+        const s =
+          (air.calm ? 0 : angDiff(windowFacing(w, doc.northDeg), wd)) * 0.5 + winTop(w, CH) * 40 + openingFactor(w) * 25;
         if (s > exScore) {
           exScore = s;
           exWin = w;
@@ -86,7 +109,7 @@ export function buildFanPlan(doc: Doc, weather: Weather | null, air: AirflowResu
       if (w === exWin) return;
       const wind = air.calm ? 0 : 180 - angDiff(windowFacing(w, doc.northDeg), wd);
       const outT = w.temp != null ? +w.temp : h.temp;
-      const score = wind * 0.5 - winSill(w) * 40 - outT;
+      const score = wind * 0.5 - winSill(w) * 40 - outT + openingFactor(w) * 25;
       if (score > inScore) {
         inScore = score;
         inWin = w;
@@ -157,8 +180,12 @@ export function buildFanPlan(doc: Doc, weather: Weather | null, air: AirflowResu
 
     // 3) BERNOULLI / CONTINUITY BOOSTER — fan in a doorway ON the main breeze path
     if (air.paths.length) {
-      let lp = air.paths[0];
-      air.paths.forEach((p) => {
+      // Prefer a path that serves a priority room; otherwise the longest path.
+      const servesPrio = (p: { roomPath: string[] }) =>
+        p.roomPath.some((rid) => roomById(rooms, rid)?.priority);
+      const pool = air.paths.some(servesPrio) ? air.paths.filter(servesPrio) : air.paths;
+      let lp = pool[0];
+      pool.forEach((p) => {
         if (p.roomPath.length > lp.roomPath.length) lp = p;
       });
       if (lp.roomPath.length >= 2) {
@@ -187,8 +214,12 @@ export function buildFanPlan(doc: Doc, weather: Weather | null, air: AirflowResu
       }
     }
 
-    // 4) RESCUE BOOSTERS — pull stagnant / one-sided rooms onto the flow path
-    [...air.singleRooms, ...air.stagnant].forEach((rid) => {
+    // 4) RESCUE BOOSTERS — pull stagnant / one-sided rooms onto the flow path.
+    // Rescue priority rooms first so they survive the fan-count / top-8 cap.
+    const rescueRooms = [...air.singleRooms, ...air.stagnant].sort(
+      (a, b) => Number(!!roomById(rooms, b)?.priority) - Number(!!roomById(rooms, a)?.priority),
+    );
+    rescueRooms.forEach((rid) => {
       const d = doc.doors.find(
         (dd) =>
           (dd.roomA === rid && air.flowRooms.has(dd.roomB)) ||
@@ -204,23 +235,29 @@ export function buildFanPlan(doc: Doc, weather: Weather | null, air: AirflowResu
       const ux = v.x / L,
         uy = v.y / L,
         back = 26;
-      const rname = roomById(rooms, rid)?.name ?? "room";
+      const target = roomById(rooms, rid);
+      const rname = target?.name ?? "room";
+      const isPrio = !!target?.priority;
       plan.push({
         x: d.x - ux * back,
         y: d.y - uy * back,
         dir: { x: ux, y: uy },
         heightM: mh,
         heightName: "Chest height — about half a metre back on the breezy side, aimed through the doorway",
-        label: `Doorway fan: push air into ${rname}`,
-        why: `${rname} is off the main breeze. ${d.open ? "" : "Open this door, then "}stand a fan a bit before the doorway on the ventilated side and shoot the jet through — it entrains room air and drags fresh air in. Don't block the gap with it.`,
-        prio: 5,
+        label: `Doorway fan: push air into ${rname}${isPrio ? " ⭐" : ""}`,
+        why: `${rname} is off the main breeze${isPrio ? " and you flagged it a priority" : ""}. ${d.open ? "" : "Open this door, then "}stand a fan a bit before the doorway on the ventilated side and shoot the jet through — it entrains room air and drags fresh air in. Don't block the gap with it.`,
+        prio: isPrio ? 3 : 5,
       });
     });
   } else {
-    // SEALED — personal circulation fans in the rooms furthest over their own target
+    // SEALED — personal circulation fans in the rooms furthest over their own target.
+    // Priority rooms jump the queue, then it's whoever is furthest over target.
     const warm = rooms
       .filter((r) => (+r.temp || 0) >= roomTarget(doc, r) - 0.5)
-      .sort((a, b) => +b.temp - roomTarget(doc, b) - (+a.temp - roomTarget(doc, a)));
+      .sort((a, b) => {
+        if (!!a.priority !== !!b.priority) return a.priority ? -1 : 1;
+        return +b.temp - roomTarget(doc, b) - (+a.temp - roomTarget(doc, a));
+      });
     warm.forEach((r, i) => {
       const c = roomCenter(r);
       const horiz = r.w >= r.h;
@@ -231,7 +268,7 @@ export function buildFanPlan(doc: Doc, weather: Weather | null, air: AirflowResu
         dir: horiz ? { x: 1, y: 0 } : { x: 0, y: 1 },
         heightM: 1.1,
         heightName: "SEATED height (~1.0–1.2 m), aimed at where you sit/sleep",
-        label: `Circulating fan: ${r.name} (${fmt(r.temp)}° · ${over > 0 ? "+" + fmt(over) : fmt(over)} vs target)`,
+        label: `Circulating fan: ${r.priority ? "⭐ " : ""}${r.name} (${fmt(r.temp)}° · ${over > 0 ? "+" + fmt(over) : fmt(over)} vs target)`,
         why: "Windows are shut, so don't pull in hotter outside air. Moving air over skin feels ~3 °C cooler. A fan angled across a doorway also entrains and drags air from the next room (Bernoulli entrainment).",
         prio: 1 + i,
       });

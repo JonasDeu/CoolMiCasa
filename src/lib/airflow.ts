@@ -5,6 +5,7 @@ import {
   roomCenter,
   windowFacing,
   windowMid,
+  winSill,
   angDiff,
 } from "./geometry";
 import { nowHour, openWindowsNow } from "./recommend";
@@ -17,6 +18,8 @@ export interface Waypoints {
 export interface DoorSuggestion {
   aName: string;
   bName: string;
+  /** True when opening this door would bring a priority room onto the cross-breeze. */
+  priority: boolean;
 }
 
 export interface AirflowResult {
@@ -133,7 +136,11 @@ export function analyzeAirflow(doc: Doc, weather: Weather | null): AirflowResult
 
   const roomsWithOpen = new Set(openWins.map((w) => w.roomId));
   if (res.calm) {
-    // no wind: use the two most-opposed open windows as the intake/exhaust pair
+    // No wind → buoyancy/temperature drives it. Find the dominant axis (the two
+    // most-opposed open windows), then sort EVERY open window onto the intake or
+    // exhaust side of that axis. A flat with windows on 3+ sides therefore gets
+    // multi-way flow (several intakes and/or exhausts), not just a single pair.
+    const outT = (w: WindowItem) => (w.temp != null ? +w.temp : h.temp);
     let best: { a: WindowItem; b: WindowItem; dd: number } | null = null;
     for (let i = 0; i < openWins.length; i++)
       for (let j = i + 1; j < openWins.length; j++) {
@@ -144,8 +151,22 @@ export function analyzeAirflow(doc: Doc, weather: Weather | null): AirflowResult
         if (!best || dd > best.dd) best = { a: openWins[i], b: openWins[j], dd };
       }
     if (best && best.dd > 60) {
-      res.intakeRooms.add(best.a.roomId);
-      res.exhaustRooms.add(best.b.roomId);
+      // Cooler (then lower) end of the axis draws air IN; the other pushes it OUT.
+      const swap =
+        outT(best.b) < outT(best.a) ||
+        (outT(best.b) === outT(best.a) && winSill(best.b) < winSill(best.a));
+      const inF = windowFacing(swap ? best.b : best.a, doc.northDeg),
+        exF = windowFacing(swap ? best.a : best.b, doc.northDeg);
+      const sortedT = openWins.map(outT).sort((x, y) => x - y);
+      const medT = sortedT[Math.floor(sortedT.length / 2)];
+      openWins.forEach((w) => {
+        const dIn = angDiff(windowFacing(w, doc.northDeg), inF),
+          dEx = angDiff(windowFacing(w, doc.northDeg), exF);
+        // Clear side → nearer facing wins; ~perpendicular → cooler-than-median air comes in.
+        const intake = Math.abs(dIn - dEx) < 25 ? outT(w) <= medT : dIn < dEx;
+        if (intake) res.intakeRooms.add(w.roomId);
+        else res.exhaustRooms.add(w.roomId);
+      });
     }
   } else {
     openWins.forEach((w) => {
@@ -219,9 +240,12 @@ export function analyzeAirflow(doc: Doc, weather: Weather | null): AirflowResult
       if (givesBoth && !alreadyBoth) {
         const ra = roomById(doc.rooms, d.roomA),
           rb = roomById(doc.rooms, d.roomB);
-        if (ra && rb) res.doorSuggest.push({ aName: ra.name, bName: rb.name });
+        if (ra && rb)
+          res.doorSuggest.push({ aName: ra.name, bName: rb.name, priority: !!(ra.priority || rb.priority) });
       }
     });
+  // Surface the doors that connect a priority room to the breeze first.
+  res.doorSuggest.sort((a, b) => Number(b.priority) - Number(a.priority));
 
   return res;
 }

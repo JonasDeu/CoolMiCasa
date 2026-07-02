@@ -8,6 +8,7 @@ export function defaultDoc(): Doc {
     comfort: 24,
     ceilingH: 2.5,
     fanCount: 2,
+    fanSize: "medium",
     canSealFan: false,
     mass: "medium",
     quickIndoorTemp: null,

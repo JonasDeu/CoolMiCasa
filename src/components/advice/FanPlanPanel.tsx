@@ -1,8 +1,8 @@
 import type { AirflowResult } from "../../lib/airflow";
-import type { FanPlan } from "../../lib/fanPlan";
+import { fanSizeNote, type FanPlan } from "../../lib/fanPlan";
 import { useStore } from "../../store/useStore";
 import { useDerived } from "../../state/derived";
-import { roomById, winArea } from "../../lib/geometry";
+import { openArea, roomById } from "../../lib/geometry";
 import { maxIndoor, nowHour } from "../../lib/recommend";
 
 export function FanPlanPanel() {
@@ -32,7 +32,10 @@ export function FanPlanPanel() {
       ) : N === 0 ? (
         <p className="muted">Set how many portable fans you have (Setup) and I'll place them.</p>
       ) : (
-        <FanCards plan={plan} owned={N} />
+        <>
+          <p className="hint">{fanSizeNote(doc.fanSize, !!(air && air.active))}</p>
+          <FanCards plan={plan} owned={N} />
+        </>
       )}
     </>
   );
@@ -49,13 +52,16 @@ export function FanPlanPanel() {
     const flow = names(air.flowRooms),
       stag = names(air.stagnant),
       single = names(air.singleRooms);
+    const prio = doc.rooms.filter((r) => r.priority);
+    const prioUnserved = prio.filter((r) => air.stagnant.has(r.id) || air.singleRooms.has(r.id));
     const st = plan.stack;
     const h = nowHour(weather);
     return (
       <div className="airflow-summary">
         {air.paths.length ? (
           <div>
-            🌬️ Cross-breeze flowing through: <b>{flow.join(", ") || "—"}</b>. Arrows on the map show the path.
+            🌬️ Cross-breeze flowing through: <b>{flow.join(", ") || "—"}</b>.{" "}
+            {air.paths.length > 1 ? "Arrows on the map trace each path through the net." : "Arrows on the map show the path."}
           </div>
         ) : (
           <div>
@@ -63,11 +69,20 @@ export function FanPlanPanel() {
             by open doors.
           </div>
         )}
+        {prio.length > 0 && (
+          <div className={prioUnserved.length ? "caveat" : "accent"}>
+            ⭐ Priority: <b>{prio.map((r) => r.name).join(", ")}</b>.{" "}
+            {prioUnserved.length > 0
+              ? `Still off the breeze: ${prioUnserved.map((r) => r.name).join(", ")} — fixes below get it first.`
+              : "on the cross-breeze."}
+          </div>
+        )}
         {single.length > 0 && <div className="muted">~ One-sided airflow (limited): {single.join(", ")}.</div>}
         {stag.length > 0 && <div className="muted">⚠ Stagnant (no fresh air): {stag.join(", ")}.</div>}
         {air.doorSuggest.map((s, i) => (
           <div className="accent" key={i}>
-            🚪 Open the door between <b>{s.aName}</b> and <b>{s.bName}</b> to connect the cross-breeze.
+            🚪 {s.priority ? "⭐ " : ""}Open the door between <b>{s.aName}</b> and <b>{s.bName}</b> to connect the
+            cross-breeze.
           </div>
         ))}
 
@@ -81,8 +96,10 @@ export function FanPlanPanel() {
   function StackCard({ st, dT }: { st: NonNullable<FanPlan["stack"]>; dT: number }) {
     const drive = (st.dH || 0) * dT;
     const strength = drive > 9 ? "strong" : drive > 3.5 ? "moderate" : "gentle";
-    const aIn = winArea(st.inWin!),
-      aOut = winArea(st.exWin!);
+    const aIn = openArea(st.inWin!),
+      aOut = openArea(st.exWin!);
+    const tiltPair =
+      st.inWin!.opening === "tilt" || st.exWin!.opening === "tilt";
     return (
       <div className="rec rec--physics">
         <div className="rec__ttl">
@@ -112,6 +129,12 @@ export function FanPlanPanel() {
             </>
           )}
         </div>
+        {tiltPair && (
+          <div className="caveat mt">
+            🪟 One of this pair is only <b>tilted (kipp)</b> — its opening is a fraction of a full sash, throttling the whole
+            chimney. Swing it fully open for a much stronger draft.
+          </div>
+        )}
         <div className="muted mt">
           📍 <b>Where to stand a fan:</b> it blows a focused jet but draws air diffusely.{" "}
           {doc.canSealFan ? (

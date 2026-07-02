@@ -65,9 +65,31 @@ export function winHeight(w: WindowItem): number {
 export function winTop(w: WindowItem, ceilingH: number): number {
   return Math.min(winSill(w) + winHeight(w), ceilingH || 2.5);
 }
-/** px·m proxy for opening size. */
+/** px·m proxy for the glazed opening size (ignores how far the window is opened). */
 export function winArea(w: WindowItem): number {
   return w.len * winHeight(w);
+}
+
+/** Window width along the wall, in centimetres (stored as canvas px). */
+export function winWidthCm(w: WindowItem): number {
+  return Math.round((w.len / PX_PER_M) * 100);
+}
+/** Convert a width in centimetres to the canvas-px `len` used in geometry. */
+export function cmToLen(cm: number): number {
+  return (Math.max(0, cm) / 100) * PX_PER_M;
+}
+
+/**
+ * Fraction of the glazed opening actually free for airflow given how it's opened.
+ * A *gekippt* (tilt) window cracks a small wedge at the top — realistically only a
+ * fraction of a fully-open sash — so it ventilates far less for the same glass.
+ */
+export function openingFactor(w: WindowItem): number {
+  return w.opening === "tilt" ? 0.2 : 1;
+}
+/** Effective free opening area (px·m proxy) for airflow, discounting tilt-only windows. */
+export function openArea(w: WindowItem): number {
+  return winArea(w) * openingFactor(w);
 }
 
 export function roomCenter(r: Room): Pt {

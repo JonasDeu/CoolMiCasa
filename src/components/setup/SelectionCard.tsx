@@ -1,6 +1,7 @@
 import { useStore } from "../../store/useStore";
 import { useDerived } from "../../state/derived";
 import {
+  cmToLen,
   compassName,
   PX_PER_M,
   roomById,
@@ -8,8 +9,9 @@ import {
   winHeight,
   winSill,
   winTop,
+  winWidthCm,
 } from "../../lib/geometry";
-import { fmt } from "../../lib/recommend";
+import { fmt, nowHour } from "../../lib/recommend";
 import { dewPointC, MUGGY_DEW } from "../../lib/humidity";
 import { estimateAsUnmeasured } from "../../lib/temps";
 import type { Side } from "../../types";
@@ -46,6 +48,19 @@ export function SelectionCard() {
       <Card title="Selected room">
         <label>Room name</label>
         <input type="text" value={r.name} onChange={(e) => updateRoom(r.id, { name: e.target.value })} />
+
+        <label className="checkbox">
+          <input
+            type="checkbox"
+            checked={!!r.priority}
+            onChange={(e) => updateRoom(r.id, { priority: e.target.checked })}
+          />{" "}
+          ⭐ Priority room — cool this one first
+        </label>
+        <Hint>
+          Flag the room you care most about (a bedroom at night). The cross-breeze is routed through it first, and it's first
+          in line for a fan.
+        </Hint>
 
         <label className="checkbox">
           <input
@@ -117,6 +132,21 @@ export function SelectionCard() {
                   : " — comfortably dry air."}
               </Hint>
             )}
+
+            <label>Target humidity (% RH)</label>
+            <input
+              type="number"
+              step={1}
+              min={0}
+              max={100}
+              value={r.rhTarget == null ? "" : r.rhTarget}
+              placeholder="optional — blank = no target"
+              onChange={(e) => updateRoom(r.id, { rhTarget: e.target.value === "" ? null : parseFloat(e.target.value) })}
+            />
+            <Hint>
+              Optional ceiling. The room is flagged (on the map and in the advice) when its humidity climbs above this — handy
+              for keeping a bedroom under, say, 55%.
+            </Hint>
           </>
         ) : (
           <Hint>
@@ -136,8 +166,8 @@ export function SelectionCard() {
         <Hint>Blank = use the default ({doc.comfort}°). A bedroom you want cooler at night can have its own target.</Hint>
 
         <Hint>
-          Size: <b>{(r.w / PX_PER_M).toFixed(1)} × {(r.h / PX_PER_M).toFixed(1)} m</b>. Name a corridor “Hallway” so airflow
-          routes through it.
+          Size: <b>{(r.w / PX_PER_M).toFixed(1)} × {(r.h / PX_PER_M).toFixed(1)} m</b>. Air routes between rooms through open
+          doors — connect a corridor with the Door tool so a cross-breeze can pass.
         </Hint>
         {del}
       </Card>
@@ -148,6 +178,10 @@ export function SelectionCard() {
     const w = doc.windows.find((x) => x.id === selection.id);
     if (!w) return null;
     const r = roomById(doc.rooms, w.roomId);
+    const oh = nowHour(weather);
+    const outT = w.temp != null ? +w.temp : oh ? oh.temp : weather?.current.temp ?? null;
+    const outRh = w.rh != null ? +w.rh : oh ? oh.rh : weather?.current.rh ?? null;
+    const outDew = outT != null && outRh != null ? dewPointC(outT, outRh) : null;
     return (
       <Card title="Selected window">
         <Hint>
@@ -164,6 +198,28 @@ export function SelectionCard() {
         />
         <Hint>A shaded courtyard window can be several degrees cooler than the rooftop forecast.</Hint>
 
+        <label>💧 Outdoor humidity in front of this window (% RH)</label>
+        <input
+          type="number"
+          step={1}
+          min={0}
+          max={100}
+          value={w.rh == null ? "" : w.rh}
+          placeholder="blank = use area forecast"
+          onChange={(e) => updateWindow(w.id, { rh: e.target.value === "" ? null : parseFloat(e.target.value) })}
+        />
+        <Hint>
+          {outDew != null ? (
+            <>
+              Air here: <b>{fmt(outT)}°</b> · <b>{Math.round(outRh as number)}% RH</b> → dew point <b>{fmt(outDew)}°</b>
+              {outDew >= MUGGY_DEW ? " — muggy; opening trades heat for stickiness." : " — dry enough to flush freely."}{" "}
+            </>
+          ) : (
+            "Optional. "
+          )}
+          A hygrometer by a shaded/ground-level window catches damp air the rooftop forecast misses, sharpening the open-vs-seal call.
+        </Hint>
+
         <label>Wall</label>
         <select value={w.side} onChange={(e) => updateWindow(w.id, { side: e.target.value as Side })}>
           {(["N", "E", "S", "W"] as Side[]).map((s) => (
@@ -173,8 +229,32 @@ export function SelectionCard() {
           ))}
         </select>
 
-        <label>Width on wall: {w.len}px</label>
-        <input type="range" min={30} max={200} value={w.len} onChange={(e) => updateWindow(w.id, { len: +e.target.value })} />
+        <label>Width on wall (cm)</label>
+        <input
+          type="number"
+          step={5}
+          min={20}
+          max={400}
+          value={winWidthCm(w)}
+          onChange={(e) => {
+            const cm = parseFloat(e.target.value);
+            if (Number.isFinite(cm)) updateWindow(w.id, { len: cmToLen(Math.max(20, Math.min(400, cm))) });
+          }}
+        />
+        <Hint>Opening width along the wall. Double-click the window on the map to edit this there too.</Hint>
+
+        <label>Opening</label>
+        <select
+          value={w.opening === "tilt" ? "tilt" : "full"}
+          onChange={(e) => updateWindow(w.id, { opening: e.target.value === "tilt" ? "tilt" : "full" })}
+        >
+          <option value="full">Opens fully (wide open)</option>
+          <option value="tilt">Tilt only — gekippt</option>
+        </select>
+        <Hint>
+          A tilted (<i>gekippt</i>) window only cracks a wedge at the top, so it ventilates roughly a fifth as much as one
+          thrown wide — the airflow model and fan plan account for it. Shown dashed with a “kipp” tag on the map.
+        </Hint>
 
         <div className="row">
           <div>

@@ -7,6 +7,7 @@ import { HelpDialog } from "./components/HelpDialog";
 import { NowBanner } from "./components/advice/NowBanner";
 import { ActionList } from "./components/advice/ActionList";
 import { FanPlanPanel } from "./components/advice/FanPlanPanel";
+import { RoomForecast } from "./components/advice/RoomForecast";
 import { Timeline } from "./components/advice/Timeline";
 import { LocationCard } from "./components/setup/LocationCard";
 import { SettingsCard } from "./components/setup/SettingsCard";
@@ -92,6 +93,9 @@ export function App() {
             </Card>
             <Card title="Airflow & fan plan">
               <FanPlanPanel />
+            </Card>
+            <Card title="Room temperature outlook">
+              <RoomForecast />
             </Card>
             <Card title="Next 24 hours">
               <Timeline />
