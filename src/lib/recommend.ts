@@ -1,5 +1,5 @@
 import type { Doc, Hour, Room, SunPos, Weather, WindowItem } from "../types";
-import { angDiff, roomById, windowFacing } from "./geometry";
+import { angDiff, roomById, windowFacing, windowFixedOpen, windowManaged } from "./geometry";
 import { dewPointC, DEW_MARGIN, MUGGY_DEW, muggyLevel } from "./humidity";
 
 export function nowHour(weather: Weather | null): Hour | null {
@@ -162,11 +162,16 @@ export function windRole(facing: number, windDir: number, windSpd: number): Wind
   return "side";
 }
 
-/** Windows we would actually have open right now (ventilate mode, not sun-blasted). */
+/**
+ * Windows physically open right now. App-managed windows are opened when it's
+ * worth it (ventilate mode, not sun-blasted); a LOCKED window is forced to its own
+ * fixed state regardless — it stays in the airflow model iff the user left it open.
+ */
 export function openWindowsNow(doc: Doc, weather: Weather | null): WindowItem[] {
   const h = nowHour(weather);
   if (!h) return [];
   return doc.windows.filter((w) => {
+    if (!windowManaged(w)) return windowFixedOpen(w);
     const r = roomById(doc.rooms, w.roomId);
     const indoorT = r ? +r.temp : maxIndoor(doc.rooms);
     const target = r ? roomTarget(doc, r) : +doc.comfort;

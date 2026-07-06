@@ -3,9 +3,12 @@ import { useDerived } from "../../state/derived";
 import {
   cmToLen,
   compassName,
+  doorManaged,
   PX_PER_M,
   roomById,
   windowFacing,
+  windowFixedOpen,
+  windowManaged,
   winHeight,
   winSill,
   winTop,
@@ -286,6 +289,36 @@ export function SelectionCard() {
           <input type="checkbox" checked={w.shade} onChange={(e) => updateWindow(w.id, { shade: e.target.checked })} />{" "}
           Has a shade / blind / curtain
         </label>
+
+        <label className="checkbox">
+          <input
+            type="checkbox"
+            checked={windowManaged(w)}
+            onChange={(e) => updateWindow(w.id, { allowOverwrite: e.target.checked })}
+          />{" "}
+          Let the plan open/close this window
+        </label>
+        {windowManaged(w) ? (
+          <Hint>
+            The app decides this window's sash hour-by-hour and lists it in the open/close steps. Untick to <b>lock</b> it —
+            the advice will then respect the state you set and never tell you to change it.
+          </Hint>
+        ) : (
+          <>
+            <label className="checkbox">
+              <input
+                type="checkbox"
+                checked={windowFixedOpen(w)}
+                onChange={(e) => updateWindow(w.id, { open: e.target.checked })}
+              />{" "}
+              Currently open (air can pass)
+            </label>
+            <Hint>
+              🔒 Locked: the airflow model treats this window as <b>{windowFixedOpen(w) ? "open" : "shut"}</b> and won't
+              suggest changing it. Re-tick “Let the plan open/close” to hand control back.
+            </Hint>
+          </>
+        )}
         {del}
       </Card>
     );
@@ -306,6 +339,20 @@ export function SelectionCard() {
         (air can pass)
       </label>
       <Hint>Drag it along the shared wall to line up with the real opening. Open doors let the cross-breeze flow.</Hint>
+
+      <label className="checkbox">
+        <input
+          type="checkbox"
+          checked={doorManaged(d)}
+          onChange={(e) => updateDoor(d.id, { allowOverwrite: e.target.checked })}
+        />{" "}
+        Let the plan open/close this door
+      </label>
+      <Hint>
+        {doorManaged(d)
+          ? "The advice may tell you to open or close this door for the breeze, and a fan can be routed through it."
+          : "🔒 Locked (default): the plan works around the state you set — it won't nag you to flip it, and won't aim a fan through it while it's shut."}
+      </Hint>
       {del}
     </Card>
   );

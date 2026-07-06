@@ -54,6 +54,18 @@ export interface WindowItem {
    * airflow through. Null/undefined = "full" (keeps old saved windows working).
    */
   opening?: "full" | "tilt" | null;
+  /**
+   * Current sash state, only consulted when the window is LOCKED
+   * (`allowOverwrite === false`). Undefined = open, so app-managed windows and old
+   * saved windows are unaffected.
+   */
+  open?: boolean;
+  /**
+   * May the plan recommend opening/closing this window? Undefined/true = yes, the
+   * app manages it hour-by-hour (the core feature). False locks it to `open`: the
+   * advice respects that state and never tells you to change it.
+   */
+  allowOverwrite?: boolean;
 }
 
 export interface Door {
@@ -63,6 +75,12 @@ export interface Door {
   x: number;
   y: number;
   open: boolean;
+  /**
+   * May the plan recommend flipping this door? Undefined/false = no, the advice and
+   * fan plan respect the open/closed state you drew (no "open it!" nags, no fan aimed
+   * through a shut door). True lets the app suggest opening/closing it for the breeze.
+   */
+  allowOverwrite?: boolean;
 }
 
 /** How heavy the building fabric is — sets how long a cool spell must last to matter. */

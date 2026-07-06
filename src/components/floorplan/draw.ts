@@ -270,8 +270,18 @@ export function drawScene(ctx: CanvasRenderingContext2D, o: DrawOpts) {
         ctx.lineTo(seg.x2 + v.x * 7, seg.y2 + v.y * 7);
         ctx.stroke();
       }
-      const label = ov.sash === "open" ? "OPEN" : ov.sunHit ? "SHADE" : "CLOSE";
-      const col = ov.sash === "open" ? COLORS.good : ov.sunHit ? COLORS.sun : COLORS.warn;
+      const base = ov.sash === "open" ? "OPEN" : ov.sunHit ? "SHADE" : "CLOSE";
+      // A locked window shows its fixed state greyed with a lock — it's a fact, not a to-do
+      // (the SHADE call still stands, though: dropping the blind is independent of the sash).
+      const locked = ov.locked && !ov.sunHit;
+      const label = locked ? "🔒 " + base : base;
+      const col = locked
+        ? COLORS.textMuted
+        : ov.sash === "open"
+          ? COLORS.good
+          : ov.sunHit
+            ? COLORS.sun
+            : COLORS.warn;
       // sit clear of the temp label: further out on the wall normal, dropped a little on E/W walls
       const bx = m.x + v.x * 34,
         by = m.y + v.y * 34 + (v.y === 0 ? 15 : 0);
@@ -530,7 +540,9 @@ function drawDoors(
     // state label, plus the verdict: ✓ when the state matches the advice,
     // a pulsing ring + "→ OPEN / → SHUT" hint when the user should flip it.
     const dv = openings.doors[d.id];
-    const ok = dv?.want != null && !dv.change;
+    // ✓ only when the plan actively manages this door and agrees; respected (locked)
+    // doors are the quiet default — no glyph, the plan just works around them.
+    const ok = dv?.want != null && !dv.change && !dv.locked;
     ctx.fillStyle = d.open ? (onPath ? "#9fe0ff" : "#7fe0bd") : "#ff9d8f";
     ctx.font = "700 9px system-ui";
     ctx.textAlign = "center";

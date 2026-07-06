@@ -3,6 +3,7 @@ import type { AirflowResult } from "./airflow";
 import {
   angDiff,
   compassName,
+  doorManaged,
   openingFactor,
   outwardVec,
   roomById,
@@ -222,6 +223,7 @@ function flushPlan(doc: Doc, weather: Weather, air: AirflowResult): FanPlan {
     for (const d of doc.doors) {
       const otherId = d.roomA === c.r.id ? d.roomB : d.roomB === c.r.id ? d.roomA : null;
       if (!otherId || usedDoors.has(d.id)) continue;
+      if (!d.open && !doorManaged(d)) continue; // shut and locked — can't route a fan through it
       const f = air.roomFlow[otherId] ?? 0;
       if (f > srcFlow && f > c.flow + 0.05) {
         srcFlow = f;
@@ -317,6 +319,7 @@ function sealedPlan(doc: Doc, weather: Weather): FanPlan {
     const a = roomById(rooms, d.roomA),
       b = roomById(rooms, d.roomB);
     if (!a || !b) continue;
+    if (!d.open && !doorManaged(d)) continue; // shut and locked — can't open it to mix
     const warm = +a.temp >= +b.temp ? a : b;
     const cool = warm === a ? b : a;
     const dT = +warm.temp - +cool.temp;

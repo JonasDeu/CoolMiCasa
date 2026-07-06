@@ -106,6 +106,7 @@ export function buildActionPlan(
   // ---- window steps ------------------------------------------------------------------
   const steps: Step[] = [];
   const closers: { id: string; title: string; why: string; note: string | null }[] = [];
+  const confirmed: Confirmation[] = [];
 
   for (const w of doc.windows) {
     const v = openings.windows[w.id];
@@ -126,6 +127,12 @@ export function buildActionPlan(
         note: v.sunFlipH != null ? `sun moves off ≈ ${hh(v.sunFlipH)}` : null,
         weight: 100,
       });
+      continue;
+    }
+
+    // Locked window: honour the state you set — report it, don't tell you to change it.
+    if (v.locked) {
+      confirmed.push({ id: `win-${w.id}`, text: `🔒 ${title} locked ${v.sash === "open" ? "open" : "shut"} — leave as is` });
       continue;
     }
 
@@ -179,10 +186,10 @@ export function buildActionPlan(
   }
 
   // ---- door steps (flips) + confirmations --------------------------------------------
-  const confirmed: Confirmation[] = [];
   for (const d of doc.doors) {
     const v = openings.doors[d.id];
     if (!v || !v.want) continue;
+    if (v.locked) continue; // respected door: the plan quietly works around it, no row
     if (v.change) {
       steps.push({
         id: `door-${d.id}`,

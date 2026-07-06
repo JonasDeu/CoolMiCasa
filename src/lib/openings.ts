@@ -1,6 +1,6 @@
 import type { Doc, Weather } from "../types";
 import type { AirflowResult } from "./airflow";
-import { roomById, windowFacing } from "./geometry";
+import { doorManaged, roomById, windowFacing, windowManaged } from "./geometry";
 import {
   maxIndoor,
   nowHour,
@@ -26,6 +26,8 @@ export interface WindowVerdict {
   note: string | null;
   /** Hour (0–23) the sun next swings onto / off this glass, or null if no flip in the next ~14 h. */
   sunFlipH: number | null;
+  /** Window is locked (not app-managed): `sash` reports its fixed state, never a change to make. */
+  locked: boolean;
 }
 
 /** The call for one internal door, compared against its current open/shut state. */
@@ -36,6 +38,8 @@ export interface DoorVerdict {
   change: boolean;
   /** A priority room drives the reasoning. */
   priority: boolean;
+  /** Door is locked (not app-managed): the plan respects the drawn state, never flips it. */
+  locked: boolean;
   aName: string;
   bName: string;
   reason: string;
@@ -130,6 +134,7 @@ export function planOpenings(doc: Doc, weather: Weather | null, air: AirflowResu
       reason,
       note,
       sunFlipH,
+      locked: !windowManaged(w),
     };
   }
 
@@ -143,6 +148,20 @@ export function planOpenings(doc: Doc, weather: Weather | null, air: AirflowResu
     let want: DoorVerdict["want"] = null,
       reason = "",
       priority = false;
+
+    // Locked door: the plan works around whatever state you drew — no flip suggested.
+    if (!doorManaged(d)) {
+      plan.doors[d.id] = {
+        want: d.open ? "open" : "close",
+        change: false,
+        priority: false,
+        locked: true,
+        aName: a.name,
+        bName: b.name,
+        reason: `locked — left ${d.open ? "open" : "shut"} as you set it`,
+      };
+      continue;
+    }
 
     if (air.active) {
       // flush mode: doors are the veins of the cross-breeze
@@ -188,7 +207,7 @@ export function planOpenings(doc: Doc, weather: Weather | null, air: AirflowResu
 
     const change = want != null && (want === "open") !== d.open;
     if (change) plan.doorChanges++;
-    plan.doors[d.id] = { want, change, priority, aName: a.name, bName: b.name, reason };
+    plan.doors[d.id] = { want, change, priority, locked: false, aName: a.name, bName: b.name, reason };
   }
 
   return plan;

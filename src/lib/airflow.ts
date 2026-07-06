@@ -2,6 +2,7 @@ import type { Doc, Pt, Weather, WindowItem } from "../types";
 import {
   angDiff,
   doorBetween,
+  doorManaged,
   openArea,
   roomById,
   roomCenter,
@@ -265,8 +266,9 @@ export function analyzeAirflow(doc: Doc, weather: Weather | null): AirflowResult
     for (const rid of p.roomPath) res.roomFlow[rid] = Math.max(res.roomFlow[rid] ?? 0, p.strength);
 
   // ---- suggest opening a CLOSED door that would link intake to exhaust ------------
+  // Only doors the user allows the plan to overwrite — a locked shut door is a wall.
   doc.doors
-    .filter((d) => !d.open)
+    .filter((d) => !d.open && doorManaged(d))
     .forEach((d) => {
       const cA = find(d.roomA),
         cB = find(d.roomB);

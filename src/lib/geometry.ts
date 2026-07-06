@@ -96,6 +96,24 @@ export function roomCenter(r: Room): Pt {
   return { x: r.x + r.w / 2, y: r.y + r.h / 2 };
 }
 
+// ---- overwrite policy: may the plan change this opening's state? --------------------
+// Windows default to app-managed (the core feature); doors default to respected
+// (work with the state you drew). A locked opening is honoured by the physics but the
+// advice never tells you to change it — and no fan is aimed through a shut locked door.
+
+/** May the plan recommend opening/closing this window? Default: yes (app-managed). */
+export function windowManaged(w: WindowItem): boolean {
+  return w.allowOverwrite !== false;
+}
+/** A locked (unmanaged) window's fixed sash state. Default: open. */
+export function windowFixedOpen(w: WindowItem): boolean {
+  return w.open !== false;
+}
+/** May the plan recommend flipping this door? Default: no (respect the drawn state). */
+export function doorManaged(d: Door): boolean {
+  return d.allowOverwrite === true;
+}
+
 export function outwardVec(side: Side): Pt {
   return { N: { x: 0, y: -1 }, S: { x: 0, y: 1 }, W: { x: -1, y: 0 }, E: { x: 1, y: 0 } }[side];
 }
