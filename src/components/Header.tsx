@@ -1,14 +1,17 @@
 import { useRef, type ChangeEvent } from "react";
 import { useStore } from "../store/useStore";
+import type { AppMode } from "../types";
 import { downloadLayout, parseLayoutFile } from "../lib/layoutFile";
 import { Clock } from "./Clock";
 
 interface Props {
+  mode: AppMode;
+  onMode: (m: AppMode) => void;
   onHelp: () => void;
   onSettings: () => void;
 }
 
-export function Header({ onHelp, onSettings }: Props) {
+export function Header({ mode, onMode, onHelp, onSettings }: Props) {
   const location = useStore((s) => s.doc.location);
   const doc = useStore((s) => s.doc);
   const loadLayout = useStore((s) => s.loadLayout);
@@ -43,6 +46,27 @@ export function Header({ onHelp, onSettings }: Props) {
       <div className="appbar__brand">
         <h1>CoolMiCasa</h1>
         <div className="appbar__sub">Passive cooling helper — no AC required</div>
+      </div>
+
+      <div className="modeswitch" role="tablist" aria-label="App mode">
+        <button
+          role="tab"
+          aria-selected={mode === "setup"}
+          className={mode === "setup" ? "is-active" : ""}
+          onClick={() => onMode("setup")}
+          title="Build & edit your flat"
+        >
+          <span aria-hidden>✏️</span> <span className="btn-label">Setup</span>
+        </button>
+        <button
+          role="tab"
+          aria-selected={mode === "plan"}
+          className={mode === "plan" ? "is-active" : ""}
+          onClick={() => onMode("plan")}
+          title="Your daily cooling plan"
+        >
+          <span aria-hidden>💡</span> <span className="btn-label">Plan</span>
+        </button>
       </div>
 
       <div className="appbar__right">

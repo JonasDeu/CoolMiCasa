@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
-import type { Doc, FanSize, LatLon, Pt, Selection, ThermalMass, Tool, Weather } from "../types";
+import type { AppMode, Doc, FanSize, LatLon, Pt, Selection, ThermalMass, Tool, Weather } from "../types";
 import { uid } from "../lib/id";
 import { nearestRoom, roomById, snapDoorPos, snapWindow, twoNearestRooms } from "../lib/geometry";
 import { TEMPLATES, templateById } from "../lib/templates";
@@ -8,6 +8,31 @@ import { defaultDoc, markLoadedRoomsMeasured, migrateFans } from "../lib/doc";
 
 const SKEY = "coolmicasa.v2";
 const SKEY_V1 = "coolmicasa.v1";
+const MODE_KEY = "coolmicasa.mode";
+
+/** A flat is "set up" once it has both a location and at least one room. */
+export function isSetupComplete(doc: Doc): boolean {
+  return !!doc.location && doc.rooms.length > 0;
+}
+
+/** First-run picks Setup; returning users land wherever they last were (else Plan if ready). */
+function loadMode(doc: Doc): AppMode {
+  try {
+    const saved = localStorage.getItem(MODE_KEY);
+    if (saved === "setup" || saved === "plan") return saved;
+  } catch {
+    /* ignore */
+  }
+  return isSetupComplete(doc) ? "plan" : "setup";
+}
+
+function persistMode(mode: AppMode) {
+  try {
+    localStorage.setItem(MODE_KEY, mode);
+  } catch {
+    /* ignore */
+  }
+}
 
 function seedDoc(): Doc {
   const d = defaultDoc();
@@ -69,6 +94,7 @@ export interface AppState {
   doc: Doc;
   weather: Weather | null;
   weatherStatus: "idle" | "loading" | "ready" | "error";
+  mode: AppMode;
   selection: Selection;
   tool: Tool;
   flashMsg: string;
@@ -88,6 +114,7 @@ export interface AppState {
   setWeather: (w: Weather | null, status: AppState["weatherStatus"]) => void;
 
   // ---- ui ----
+  setMode: (m: AppMode) => void;
   setTool: (t: Tool) => void;
   select: (sel: Selection) => void;
   flash: (msg: string) => void;
@@ -121,11 +148,14 @@ export interface AppState {
   resetAll: () => void;
 }
 
+const initialDoc = loadDoc();
+
 export const useStore = create<AppState>()(
   immer((set, get) => ({
-    doc: loadDoc(),
+    doc: initialDoc,
     weather: null,
     weatherStatus: "idle",
+    mode: loadMode(initialDoc),
     selection: null,
     tool: "select",
     flashMsg: "",
@@ -189,6 +219,17 @@ export const useStore = create<AppState>()(
         s.weatherStatus = status;
       }),
 
+    setMode: (m) =>
+      set((s) => {
+        s.mode = m;
+        // Leaving the editor: drop the drawing tool and any selection so the
+        // read-only plan map starts clean.
+        if (m === "plan") {
+          s.selection = null;
+          s.tool = "select";
+        }
+        persistMode(m);
+      }),
     setTool: (t) =>
       set((s) => {
         s.tool = t;
@@ -410,6 +451,8 @@ export const useStore = create<AppState>()(
         s.weather = null;
         s.weatherStatus = "idle";
         s.undoStack = [];
+        s.mode = "setup";
+        persistMode("setup");
         persist(s.doc);
       }),
   })),

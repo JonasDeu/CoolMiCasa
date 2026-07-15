@@ -28,7 +28,7 @@ interface Editing {
   top: number;
 }
 
-export function FloorPlanCanvas() {
+export function FloorPlanCanvas({ readOnly = false }: { readOnly?: boolean } = {}) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const popRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<Drag>(null);
@@ -172,6 +172,12 @@ export function FloorPlanCanvas() {
       return;
     }
 
+    // Plan-mode map is inspect-only: drag pans, wheel zooms, nothing is edited.
+    if (readOnly) {
+      startPan(ev, false);
+      return;
+    }
+
     const p = toCanvas(ev);
 
     if (s.tool === "room") {
@@ -283,6 +289,7 @@ export function FloorPlanCanvas() {
   }
 
   function onDoubleClick(ev: React.MouseEvent) {
+    if (readOnly) return;
     const s = useStore.getState();
     const p = toCanvas(ev);
     const d = hitDoor(p);
@@ -308,6 +315,7 @@ export function FloorPlanCanvas() {
 
   function onContextMenu(ev: React.MouseEvent) {
     ev.preventDefault();
+    if (readOnly) return;
     const s = useStore.getState();
     const p = toCanvas(ev);
     const d = hitDoor(p);

@@ -90,8 +90,8 @@ export function LocationCard() {
             onChange={(e) => setQuickIndoorTemp(e.target.value === "" ? null : parseFloat(e.target.value))}
           />
           <Hint>
-            Get an instant open/seal verdict and hourly timeline from just this. Draw your flat (Plan tab) for room-by-room
-            advice and a fan plan.
+            Get an instant open/seal verdict and hourly timeline from just this. Draw your flat on the canvas for
+            room-by-room advice and a fan plan.
           </Hint>
         </>
       )}

@@ -307,21 +307,82 @@ button.full {
   color: var(--muted);
 }
 
-/* ---- layout ---- */
-.layout {
-  display: block;
-  padding: 14px 16px 84px;
+/* ---- mode switch (Setup ↔ Plan, in the header) ---- */
+.modeswitch {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+}
+.modeswitch button {
+  border: 1px solid transparent;
+  background: transparent;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 13px;
+}
+.modeswitch button.is-active {
+  background: var(--accent);
+  color: #04263a;
+  border-color: var(--accent);
+}
+
+/* ---- layout: Setup & Plan views (mobile-first: everything stacks) ---- */
+.setup-view,
+.plan-view {
   flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 14px 16px 32px;
 }
 .col {
-  display: none;
+  display: flex;
   flex-direction: column;
   gap: 14px;
 }
-.layout[data-tab="setup"] .col--setup,
-.layout[data-tab="plan"] .col--plan,
-.layout[data-tab="advice"] .col--advice {
+.setup-view__body {
   display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* the little "Set up your home" intro / call-to-action bar */
+.setup-intro {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+}
+.setup-intro__title {
+  margin: 0;
+  font-size: 16px;
+}
+.setup-intro__sub {
+  margin: 3px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  max-width: 62ch;
+}
+.setup-intro__actions {
+  display: flex;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+/* the read-only plan map lives inside a card, so it just fills the card width */
+.canvas-wrap--map {
+  margin-top: 4px;
 }
 
 /* ---- card ---- */
@@ -936,31 +997,6 @@ button.full {
   border: 1px solid var(--line);
 }
 
-/* ---- tabbar (mobile) ---- */
-.tabbar {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  z-index: 30;
-  display: flex;
-  gap: 6px;
-  padding: 8px 10px calc(8px + env(safe-area-inset-bottom));
-  background: rgba(15, 23, 32, 0.92);
-  backdrop-filter: blur(10px);
-  border-top: 1px solid var(--line);
-}
-.tabbar button {
-  flex: 1;
-  padding: 10px;
-  font-weight: 600;
-}
-.tabbar button.is-active {
-  background: var(--accent);
-  color: #04263a;
-  border-color: var(--accent);
-}
-
 /* ---- help dialog ---- */
 .help-dialog {
   max-width: 640px;
@@ -1076,29 +1112,55 @@ button.full {
   .now-banner__kpis .kpi__v {
     font-size: 17px;
   }
-  .layout {
+  /* the view fills the viewport; only its columns scroll */
+  .setup-view,
+  .plan-view {
+    padding: 14px 16px;
+    overflow: hidden;
+  }
+
+  /* Setup: editor sidebar + drawing canvas */
+  .setup-view__body {
+    flex: 1;
+    min-height: 0;
     display: grid;
-    grid-template-columns: 300px minmax(440px, 1fr) 380px;
+    grid-template-columns: 320px minmax(440px, 1fr);
     grid-template-rows: minmax(0, 1fr);
     gap: 16px;
     align-items: stretch;
-    padding: 16px;
-    flex: 1;
-    min-height: 0;
     overflow: hidden;
   }
-  /* left & right columns scroll independently within the viewport */
-  .col {
-    display: flex !important;
+  .setup-view__side {
     height: 100%;
     min-height: 0;
     overflow: auto;
     padding-bottom: 8px;
   }
-  /* middle column fits its canvas to the available height — no scroll */
-  .col--plan {
+  /* the canvas column fits its map to the available height — no scroll */
+  .setup-view__plan {
+    min-height: 0;
     overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
   }
+
+  /* Plan: advice column + read-only map, each scrolls independently */
+  .plan-view {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 400px;
+    grid-template-rows: minmax(0, 1fr);
+    gap: 16px;
+    align-items: stretch;
+  }
+  .plan-view__advice,
+  .plan-view__map {
+    height: 100%;
+    min-height: 0;
+    overflow: auto;
+    padding-bottom: 8px;
+  }
+
   .canvas-area {
     flex: 1;
     min-height: 0;
@@ -1112,18 +1174,22 @@ button.full {
     max-width: 100%;
     max-height: 100%;
   }
-  .col--plan .floorplan-canvas {
+  /* map inside the plan card keeps its natural aspect ratio, not full height */
+  .canvas-wrap--map {
+    height: auto;
+  }
+  .setup-view__plan .floorplan-canvas {
     width: 100%;
     height: 100%;
     aspect-ratio: auto;
   }
-  .tabbar {
-    display: none;
-  }
 }
 
 @media (min-width: 1500px) {
-  .layout {
-    grid-template-columns: 320px minmax(520px, 1fr) 400px;
+  .setup-view__body {
+    grid-template-columns: 340px minmax(520px, 1fr);
+  }
+  .plan-view {
+    grid-template-columns: minmax(0, 1fr) 440px;
   }
 }

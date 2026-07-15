@@ -170,3 +170,6 @@ export type Selection =
   | null;
 
 export type Tool = "select" | "room" | "window" | "door";
+
+/** Top-level app mode: build your flat (setup) vs. read the daily plan. */
+export type AppMode = "setup" | "plan";
